@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createContactMessage } from '@/lib/contactMessages'
+import { notifySyncedEmailOfTicket } from '@/lib/ticketEmailSync'
 
 export const runtime = 'nodejs'
 
@@ -27,6 +28,12 @@ export async function POST(request: Request) {
       subject: String(subject),
       message: String(message),
     })
+
+    try {
+      await notifySyncedEmailOfTicket(saved)
+    } catch (mailError) {
+      console.error('Ticket notification email failed:', mailError)
+    }
 
     return NextResponse.json({ success: true, messageId: saved.id })
   } catch {

@@ -7,7 +7,8 @@ export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   try {
-    const { login, password } = await request.json()
+    const body = await request.json()
+    const { login, password } = body ?? {}
 
     if (!login?.trim() || !password) {
       return NextResponse.json({ error: 'Username/email and password are required' }, { status: 400 })
@@ -32,7 +33,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ token, user: dbUserToUser(user) })
-  } catch {
+  } catch (error) {
+    console.error('Login error:', error)
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }

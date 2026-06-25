@@ -12,7 +12,7 @@ export const INVOICE_TEMPLATE_HEADERS = [
   'Invoice ID',
   'Order ID',
   'Customer Name',
-  'Amount (IND)',
+  'Amount (₹)',
   'Payment Status',
   'Payment Method',
   'Generated Date',

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { PasswordField } from '@/components/PasswordField'
 import { useApp } from '@/lib/context'
 import { LogIn } from 'lucide-react'
 import styles from './page.module.css'
@@ -28,17 +29,10 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(loginId, password)
-      const token = localStorage.getItem('hds_session_token')
-      const res = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      if (data.user?.role === 'admin' || data.user?.role === 'staff') {
-        router.push('/admin')
-      } else {
-        router.push('/account')
-      }
+      const loggedInUser = await login(loginId, password)
+      router.push(
+        loggedInUser.role === 'admin' || loggedInUser.role === 'staff' ? '/admin' : '/account'
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -68,19 +62,19 @@ export default function LoginPage() {
               placeholder="your username or email"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
+              autoComplete="username"
             />
 
             <label htmlFor="password" className={styles.label}>
               Password
             </label>
-            <input
+            <PasswordField
               id="password"
-              type="password"
-              required
-              className={styles.input}
-              placeholder="Enter your password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
+              placeholder="Enter your password"
+              required
+              autoComplete="current-password"
             />
 
             <div className={styles.forgotRow}>

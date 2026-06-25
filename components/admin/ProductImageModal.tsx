@@ -7,7 +7,7 @@ import styles from './ProductImageModal.module.css'
 type ProductImageModalProps = {
   name: string
   image: string
-  sku?: string
+  modelId?: string
   manufacturingId?: string
   onClose: () => void
 }
@@ -15,7 +15,7 @@ type ProductImageModalProps = {
 export function ProductImageModal({
   name,
   image,
-  sku,
+  modelId,
   manufacturingId,
   onClose,
 }: ProductImageModalProps) {
@@ -34,10 +34,10 @@ export function ProductImageModal({
         <h2 id="product-image-title" className={styles.title}>
           {name}
         </h2>
-        {(sku || manufacturingId) && (
+        {(modelId || manufacturingId) && (
           <p className={styles.meta}>
-            {sku && <span>SKU: {sku}</span>}
-            {sku && manufacturingId && <span> · </span>}
+            {modelId && <span>Model ID: {modelId}</span>}
+            {modelId && manufacturingId && <span> · </span>}
             {manufacturingId && <span>MFG: {manufacturingId}</span>}
           </p>
         )}

@@ -164,7 +164,7 @@ export default function BulkOrderPage() {
           </h2>
           <p className={styles.cardHint}>
             Use the spreadsheet template with <strong>Model Number</strong> and <strong>Qty</strong>{' '}
-            columns. Model numbers should match product SKUs (e.g. HDS-SNT-4K-001).
+            columns. Model numbers should match product Model IDs (e.g. HDS-SNT-4K-001).
           </p>
           <div className={styles.actions}>
             <a href="/api/bulk-order/template?format=xlsx" className={`${styles.btn} ${styles.btnPrimary}`}>

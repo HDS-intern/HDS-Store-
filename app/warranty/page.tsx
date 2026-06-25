@@ -59,7 +59,7 @@ const WARRANTY_TYPES = [
 ]
 
 const CLAIM_STEPS = [
-  'Contact info@hds-india.com with your order number, product SKU, and issue description.',
+  'Contact info@hds-india.com with your order number, product Model ID, and issue description.',
   'Include photos or video demonstrating the defect when possible.',
   'Our technical team will diagnose remotely and issue an RMA number if needed.',
   'Ship the unit in original packaging (or approved protective case) to our service center.',

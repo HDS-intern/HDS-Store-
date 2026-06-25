@@ -208,7 +208,7 @@ export default function ProductDetailPage() {
 
             <div className={styles.metaRow}>
               <span>
-                <span className={styles.metaLabel}>SKU:</span> {product.sku}
+                <span className={styles.metaLabel}>Model ID:</span> {product.modelId}
               </span>
               <span>
                 <span className={styles.metaLabel}>Brand:</span> {product.brand}
@@ -426,7 +426,7 @@ export default function ProductDetailPage() {
                 <a href={`mailto:${product.support.email}`} className="text-accent hover:underline">
                   {product.support.email}
                 </a>{' '}
-                with your order number and SKU ({product.sku}).
+                with your order number and Model ID ({product.modelId}).
               </p>
             </div>
           )}

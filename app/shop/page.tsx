@@ -182,7 +182,7 @@ export default function ShopPage() {
                 }
               >
                 {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} stackedPrice />
                 ))}
               </div>
             ) : (

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { apiFetch } from '@/lib/api'
+import { PasswordField } from '@/components/PasswordField'
 import { LockKeyhole } from 'lucide-react'
 import styles from '../login/page.module.css'
 
@@ -36,13 +38,10 @@ function ResetPasswordForm() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const data = await apiFetch<{ message?: string }>('/api/auth/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Reset failed')
 
       setSuccess(data.message || 'Password updated successfully.')
       setTimeout(() => router.push('/login'), 2000)
@@ -79,29 +78,27 @@ function ResetPasswordForm() {
         <label htmlFor="password" className={styles.label}>
           New Password
         </label>
-        <input
+        <PasswordField
           id="password"
-          type="password"
+          value={password}
+          onChange={setPassword}
+          placeholder="Enter new password"
           required
           minLength={4}
-          className={styles.input}
-          placeholder="Enter new password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
         />
 
         <label htmlFor="confirmPassword" className={styles.label}>
           Confirm Password
         </label>
-        <input
+        <PasswordField
           id="confirmPassword"
-          type="password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          placeholder="Confirm new password"
           required
           minLength={4}
-          className={styles.input}
-          placeholder="Confirm new password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          autoComplete="new-password"
         />
 
         <button type="submit" className={styles.submitBtn} disabled={loading || Boolean(success)}>

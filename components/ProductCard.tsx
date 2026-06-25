@@ -10,9 +10,11 @@ import { useState } from 'react'
 
 interface ProductCardProps {
   product: Product
+  /** Stack original price below discounted price (shop page). */
+  stackedPrice?: boolean
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, stackedPrice = false }: ProductCardProps) {
   const { cart, addToCart, updateCartQuantity, addToWishlist, removeFromWishlist, wishlist } =
     useApp()
   const [showAddedNotification, setShowAddedNotification] = useState(false)
@@ -57,7 +59,7 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <Link
       href={`/product/${product.id}`}
-      className="group relative bg-card rounded-2xl overflow-hidden border border-border hover:shadow-2xl transition-all duration-400 hover:border-primary/40 hover:-translate-y-2"
+      className="group relative flex h-full flex-col bg-card rounded-2xl overflow-hidden border border-border hover:shadow-2xl transition-all duration-400 hover:border-primary/40 hover:-translate-y-2"
       style={{ boxShadow: '0 4px 20px rgba(53, 106, 176, 0.06)' }}
     >
       {/* Image Container */}
@@ -95,105 +97,116 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
 
       {/* Content */}
-      <div className="p-4 space-y-3">
-        {/* Category & Rating */}
-        <div className="flex justify-between items-start">
-          <p className="text-xs font-semibold text-primary uppercase tracking-wide">
-            {product.category}
-          </p>
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-bold text-foreground">★ {product.rating}</span>
-            <span className="text-xs text-muted-foreground">
-              ({product.reviews})
-            </span>
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex flex-1 flex-col gap-3">
+          {/* Category & Rating */}
+          <div className="flex justify-between items-start">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+              {product.category}
+            </p>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-sm font-bold text-foreground">★ {product.rating}</span>
+              <span className="text-xs text-muted-foreground">
+                ({product.reviews})
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Product Name */}
-        <h3 className="font-bold text-lg text-foreground line-clamp-2 group-hover:text-accent transition-colors">
-          {product.name}
-        </h3>
+          {/* Product Name */}
+          <h3 className="min-h-[3.5rem] font-bold text-lg text-foreground line-clamp-2 group-hover:text-accent transition-colors">
+            {product.name}
+          </h3>
 
-        {/* Stock Status */}
-        <p
-          className={`text-xs font-semibold ${
-            product.inStock
-              ? 'text-green-600'
-              : 'text-destructive'
-          }`}
-        >
-          {product.inStock
-            ? `✓ In Stock (${product.stock} qty)`
-            : 'Out of Stock'}
-        </p>
+          {/* Stock Status */}
+          <p
+            className={`text-xs font-semibold ${
+              product.inStock
+                ? 'text-green-600'
+                : 'text-destructive'
+            }`}
+          >
+            {product.inStock
+              ? `✓ In Stock (${product.stock} qty)`
+              : 'Out of Stock'}
+          </p>
 
-        {/* Price */}
-        <div className="flex items-baseline gap-2 pt-2">
-          <span className="text-2xl font-bold text-primary">{formatPrice(product.price)}</span>
-          {product.originalPrice && (
-            <span className="text-sm text-muted-foreground line-through">
-              {formatPrice(product.originalPrice)}
+          {/* Price */}
+          <div
+            className={
+              stackedPrice
+                ? 'flex min-h-[3.25rem] flex-col items-start gap-0.5'
+                : 'flex min-h-[2.75rem] flex-wrap items-baseline gap-x-2 gap-y-0.5'
+            }
+          >
+            <span className="text-2xl font-bold text-primary whitespace-nowrap">
+              {formatPrice(product.price)}
             </span>
-          )}
+            {product.originalPrice && (
+              <span className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                {formatPrice(product.originalPrice)}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Add to Cart / Quantity */}
-        {cartQuantity > 0 ? (
-          <div
-            className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-            }}
-          >
-            <span className="text-sm font-semibold text-primary">In cart</span>
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDecreaseQuantity}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-white text-primary hover:bg-primary/10 transition-colors"
-                  aria-label="Decrease quantity"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <span className="min-w-[2rem] text-center text-base font-bold text-primary">
-                  {cartQuantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleIncreaseQuantity}
-                  disabled={atStockLimit}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-white text-primary hover:bg-primary/10 transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
-                  aria-label="Increase quantity"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+        <div className="mt-auto shrink-0 pt-3">
+          {cartQuantity > 0 ? (
+            <div
+              className="flex items-center justify-between gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+            >
+              <span className="text-sm font-semibold text-primary">In cart</span>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDecreaseQuantity}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-white text-primary hover:bg-primary/10 transition-colors"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="min-w-[2rem] text-center text-base font-bold text-primary">
+                    {cartQuantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleIncreaseQuantity}
+                    disabled={atStockLimit}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-white text-primary hover:bg-primary/10 transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                {atStockLimit && (
+                  <span className="text-[0.6875rem] font-semibold text-red-600 leading-tight text-right">
+                    Current stock is reached
+                  </span>
+                )}
               </div>
-              {atStockLimit && (
-                <span className="text-[0.6875rem] font-semibold text-red-600 leading-tight text-right">
-                  Current stock is reached
-                </span>
-              )}
             </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            disabled={!product.inStock}
-            className="relative w-full mt-4 py-2.5 rounded-xl font-semibold text-white hover:shadow-lg transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              background: 'linear-gradient(135deg, rgba(53, 106, 176, 1), rgba(74, 126, 196, 1))',
-              boxShadow: '0 4px 14px rgba(53, 106, 176, 0.3)',
-            }}
-          >
-            <ShoppingCart className="w-4 h-4" />
-            Add to Cart
-          </button>
-        )}
+          ) : (
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={!product.inStock}
+              className="relative w-full py-2.5 rounded-xl font-semibold text-white hover:shadow-lg transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg, rgba(53, 106, 176, 1), rgba(74, 126, 196, 1))',
+                boxShadow: '0 4px 14px rgba(53, 106, 176, 0.3)',
+              }}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              Add to Cart
+            </button>
+          )}
+        </div>
 
-        {/* Notification */}
         {showAddedNotification && (
           <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap shadow-lg">
             Added to cart!

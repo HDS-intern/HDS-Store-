@@ -4,7 +4,7 @@ export const PRODUCTS: Product[] = [
   {
     id: '1',
     name: 'Sentinel Pro 4K',
-    sku: 'HDS-SNT-4K-001',
+    modelId: 'HDS-SNT-4K-001',
     manufacturingId: 'MFG-SNT-4K-001',
     brand: 'Hawking Defence',
     price: 2499,
@@ -68,7 +68,7 @@ export const PRODUCTS: Product[] = [
         'Normal wear on propellers and landing gear',
       ],
       extendedAvailable: true,
-      extendedPrice: 'IND 299/year',
+      extendedPrice: '₹299/year',
     },
     reviewList: [
       {
@@ -116,7 +116,7 @@ export const PRODUCTS: Product[] = [
   {
     id: '2',
     name: 'Guardian X500',
-    sku: 'HDS-GRD-X500-002',
+    modelId: 'HDS-GRD-X500-002',
     manufacturingId: 'MFG-GRD-X500-002',
     brand: 'Hawking Defence',
     price: 1899,
@@ -180,7 +180,7 @@ export const PRODUCTS: Product[] = [
         'Battery degradation after 300 cycles',
       ],
       extendedAvailable: true,
-      extendedPrice: 'IND 249/year',
+      extendedPrice: '₹249/year',
     },
     reviewList: [
       {
@@ -218,7 +218,7 @@ export const PRODUCTS: Product[] = [
   {
     id: '3',
     name: 'Viper 3000 Elite',
-    sku: 'HDS-VPR-3K-003',
+    modelId: 'HDS-VPR-3K-003',
     manufacturingId: 'MFG-VPR-3K-003',
     brand: 'Hawking Defence',
     price: 1649,
@@ -282,7 +282,7 @@ export const PRODUCTS: Product[] = [
         'Batteries after 200 charge cycles',
       ],
       extendedAvailable: true,
-      extendedPrice: 'IND 399/year',
+      extendedPrice: '₹399/year',
     },
     reviewList: [
       {
@@ -329,7 +329,7 @@ export const PRODUCTS: Product[] = [
   {
     id: '4',
     name: 'Aurora Reconnaissance',
-    sku: 'HDS-AUR-ISR-004',
+    modelId: 'HDS-AUR-ISR-004',
     manufacturingId: 'MFG-AUR-ISR-004',
     brand: 'Hawking Defence',
     price: 3299,
@@ -431,7 +431,7 @@ export const PRODUCTS: Product[] = [
   {
     id: '5',
     name: 'Falcon Scout Lite',
-    sku: 'HDS-FCN-LTE-005',
+    modelId: 'HDS-FCN-LTE-005',
     manufacturingId: 'MFG-FCN-LTE-005',
     brand: 'Hawking Defence',
     price: 799,
@@ -495,7 +495,7 @@ export const PRODUCTS: Product[] = [
         'Propeller and consumable parts',
       ],
       extendedAvailable: true,
-      extendedPrice: 'IND 79/year',
+      extendedPrice: '₹79/year',
     },
     reviewList: [
       {
@@ -551,7 +551,7 @@ export const PRODUCTS: Product[] = [
   {
     id: '6',
     name: 'Phoenix Heavy Lift',
-    sku: 'HDS-PHX-HL-006',
+    modelId: 'HDS-PHX-HL-006',
     manufacturingId: 'MFG-PHX-HL-006',
     brand: 'Hawking Defence',
     price: 4499,
@@ -615,7 +615,7 @@ export const PRODUCTS: Product[] = [
         'Commercial misuse outside spec',
       ],
       extendedAvailable: true,
-      extendedPrice: 'IND 599/year',
+      extendedPrice: '₹599/year',
     },
     reviewList: [
       {
@@ -671,11 +671,11 @@ export const CATEGORIES = [
 ]
 
 export const PRICE_RANGES = [
-  { label: 'Under IND 500', min: 0, max: 500 },
-  { label: 'IND 500 - 1,000', min: 500, max: 1000 },
-  { label: 'IND 1,000 - 2,000', min: 1000, max: 2000 },
-  { label: 'IND 2,000 - 3,000', min: 2000, max: 3000 },
-  { label: 'Over IND 3,000', min: 3000, max: 999999 },
+  { label: 'Under ₹500', min: 0, max: 500 },
+  { label: '₹500 - 1,000', min: 500, max: 1000 },
+  { label: '₹1,000 - 2,000', min: 1000, max: 2000 },
+  { label: '₹2,000 - 3,000', min: 2000, max: 3000 },
+  { label: 'Over ₹3,000', min: 3000, max: 999999 },
 ]
 
 export const RATINGS = [

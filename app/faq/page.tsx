@@ -84,7 +84,7 @@ const FAQ_CATEGORIES = [
       {
         question: 'How do I file a warranty claim?',
         answer:
-          'Contact info@hds-india.com with your order number, product SKU, and a description of the issue. Include photos or video if applicable. Our support team will guide you through the RMA process.',
+          'Contact info@hds-india.com with your order number, product Model ID, and a description of the issue. Include photos or video if applicable. Our support team will guide you through the RMA process.',
       },
     ],
   },

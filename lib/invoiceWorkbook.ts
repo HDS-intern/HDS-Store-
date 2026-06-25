@@ -39,7 +39,7 @@ function placeholderMap(invoice: InvoiceDetail): Record<string, string> {
     order_id: invoice.orderId,
     customer_name: invoice.customerName || invoice.userId,
     amount: String(invoice.total),
-    amount_ind: formatPrice(invoice.total).replace('IND ', ''),
+    amount_ind: formatPrice(invoice.total).replace(/^₹/, ''),
     payment_status: invoice.paymentStatus,
     payment_method: formatPaymentMethod(invoice.paymentMethod),
     generated_date: formatInvoiceDate(invoice.createdAt),

@@ -106,13 +106,13 @@
   border-radius: 0.125rem;
 }
 
-.skuCell {
+.modelIdCell {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 
-.skuSub {
+.modelIdSub {
   font-size: 0.75rem;
   color: #64748b;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

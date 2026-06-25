@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { apiFetch } from '@/lib/api'
 import { KeyRound } from 'lucide-react'
 import styles from '../login/page.module.css'
 
@@ -19,13 +20,10 @@ export default function ForgotPasswordPage() {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/forgot-password', {
+      const data = await apiFetch<{ token: string }>('/api/auth/forgot-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Request failed')
 
       router.push(`/reset-password?token=${encodeURIComponent(data.token)}`)
     } catch (err) {

@@ -10,7 +10,7 @@ export type ParsedBulkLine = BulkOrderRow & {
   error?: string
 }
 
-const MODEL_HEADERS = ['model number', 'model', 'model no', 'modelno', 'sku', 'product sku']
+const MODEL_HEADERS = ['model id', 'model number', 'model', 'model no', 'modelno', 'sku', 'product sku']
 const QTY_HEADERS = ['qty', 'quantity', 'qnty', 'count']
 
 function normalizeHeader(value: string): string {
@@ -60,7 +60,7 @@ export function matchBulkRowsToProducts(rows: BulkOrderRow[], products: Product[
     const key = row.modelNumber.toLowerCase()
     const product = products.find(
       (p) =>
-        p.sku.toLowerCase() === key ||
+        p.modelId.toLowerCase() === key ||
         p.id.toLowerCase() === key ||
         p.name.toLowerCase() === key ||
         p.name.toLowerCase().includes(key)

@@ -18,7 +18,7 @@ import { SiteLoadingGate } from '@/components/SiteLoadingGate'
 interface AppContextType {
   user: User | null
   authLoading: boolean
-  login: (login: string, password: string) => Promise<void>
+  login: (login: string, password: string) => Promise<User>
   register: (data: {
     username: string
     email: string
@@ -165,21 +165,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user, refreshOrders])
 
   useEffect(() => {
+    let cancelled = false
+
     const init = async () => {
-      await refreshProducts()
-      const token = getStoredToken()
-      if (token) {
-        try {
-          const data = await apiFetch<{ user: User }>('/api/auth/me')
-          setUser(data.user)
-          await refreshOrders()
-        } catch {
-          setStoredToken(null)
+      const work = (async () => {
+        await refreshProducts()
+        const token = getStoredToken()
+        if (token) {
+          try {
+            const data = await apiFetch<{ user: User }>('/api/auth/me')
+            if (!cancelled) setUser(data.user)
+            await refreshOrders()
+          } catch {
+            if (!cancelled) setStoredToken(null)
+          }
         }
-      }
-      setAuthLoading(false)
+      })()
+
+      const timeout = new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 5000)
+      })
+
+      await Promise.race([work, timeout])
+      if (!cancelled) setAuthLoading(false)
     }
+
     init()
+    return () => {
+      cancelled = true
+    }
   }, [refreshProducts, refreshOrders])
 
   const login = useCallback(
@@ -191,6 +205,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setStoredToken(data.token)
       setUser(data.user)
       await refreshOrders()
+      return data.user
     },
     [refreshOrders]
   )

@@ -24,7 +24,7 @@ export interface WarrantyInfo {
 export interface Product {
   id: string
   name: string
-  sku: string
+  modelId: string
   manufacturingId: string
   brand: string
   price: number

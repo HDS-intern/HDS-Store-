@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Mail, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import type { ContactMessage } from '@/lib/contactMessages'
+import { TicketEmailSyncModal } from '@/components/admin/TicketEmailSyncModal'
 import styles from './AdminContactMessagesPanel.module.css'
 
 function formatMessageDate(value: string) {
@@ -41,6 +42,17 @@ export function AdminContactMessagesPanel({
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [viewMessage, setViewMessage] = useState<ContactMessage | null>(null)
+  const [syncedEmail, setSyncedEmail] = useState<string | null>(null)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
+
+  const loadSyncStatus = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ syncedEmail: string | null }>('/api/admin/ticket-email-sync')
+      setSyncedEmail(data.syncedEmail || null)
+    } catch {
+      setSyncedEmail(null)
+    }
+  }, [])
 
   const syncUnreadCount = useCallback(
     (count: number) => {
@@ -85,7 +97,8 @@ export function AdminContactMessagesPanel({
 
   useEffect(() => {
     loadMessages(true)
-  }, [loadMessages])
+    void loadSyncStatus()
+  }, [loadMessages, loadSyncStatus])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -104,11 +117,31 @@ export function AdminContactMessagesPanel({
             Support tickets submitted from the HDS Assistant chat widget. Refreshes every 10 seconds.
           </p>
         </div>
-        <button type="button" className={styles.refreshBtn} onClick={() => loadMessages(true)}>
-          <RefreshCw className={`w-4 h-4 ${loading ? styles.spinning : ''}`} />
-          Refresh
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={`${styles.syncBtn} ${syncedEmail ? styles.syncBtnActive : ''}`}
+            onClick={() => setSyncModalOpen(true)}
+            title={syncedEmail ? `Notifications: ${syncedEmail}` : 'Sync mail for ticket notifications'}
+          >
+            <Mail className="w-4 h-4 shrink-0" />
+            <span className={styles.syncBtnLabel}>
+              {syncedEmail ? syncedEmail : 'Sync Mail'}
+            </span>
+          </button>
+          <button type="button" className={styles.refreshBtn} onClick={() => loadMessages(true)}>
+            <RefreshCw className={`w-4 h-4 ${loading ? styles.spinning : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      <TicketEmailSyncModal
+        open={syncModalOpen}
+        initialEmail={syncedEmail}
+        onClose={() => setSyncModalOpen(false)}
+        onSynced={(email) => setSyncedEmail(email)}
+      />
 
       <div className={styles.tableWrap}>
         <table className={styles.table}>

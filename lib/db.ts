@@ -253,6 +253,13 @@ function migrateSchema(db: Database.Database) {
       read_at TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS ticket_email_verifications (
+      email TEXT NOT NULL,
+      otp_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `)
 
   const contactCols = db.prepare('PRAGMA table_info(contact_messages)').all() as { name: string }[]
@@ -267,8 +274,30 @@ function migrateSchema(db: Database.Database) {
 
   backfillInvoices(db)
   backfillProductManufacturingIds(db)
+  backfillProductModelIds(db)
 
   seedMainTemplate(db)
+}
+
+type LegacyProduct = Product & { sku?: string }
+
+function normalizeProduct(product: LegacyProduct): Product {
+  const modelId = (product.modelId ?? product.sku ?? '').trim()
+  const { sku: _legacySku, ...rest } = product
+  return { ...rest, modelId }
+}
+
+function backfillProductModelIds(db: Database.Database) {
+  const rows = db.prepare('SELECT id, data FROM products').all() as { id: string; data: string }[]
+  const update = db.prepare('UPDATE products SET data = ? WHERE id = ?')
+
+  for (const row of rows) {
+    const raw = JSON.parse(row.data) as LegacyProduct
+    if (!raw.sku && raw.modelId?.trim()) continue
+
+    const normalized = normalizeProduct(raw)
+    update.run(JSON.stringify(normalized), row.id)
+  }
 }
 
 function backfillProductManufacturingIds(db: Database.Database) {
@@ -276,11 +305,11 @@ function backfillProductManufacturingIds(db: Database.Database) {
   const update = db.prepare('UPDATE products SET data = ? WHERE id = ?')
 
   for (const row of rows) {
-    const product = JSON.parse(row.data) as Product
+    const product = normalizeProduct(JSON.parse(row.data) as LegacyProduct)
     if (product.manufacturingId?.trim()) continue
 
-    const manufacturingId = product.sku
-      ? product.sku.replace(/^HDS-/i, 'MFG-')
+    const manufacturingId = product.modelId
+      ? product.modelId.replace(/^HDS-/i, 'MFG-')
       : `MFG-${product.id}`
 
     update.run(JSON.stringify({ ...product, manufacturingId }), row.id)
@@ -489,7 +518,7 @@ export function getAllProducts(): Product[] {
   }[]
 
   return rows.map((row) => {
-    const product = JSON.parse(row.data) as Product
+    const product = normalizeProduct(JSON.parse(row.data) as LegacyProduct)
     return {
       ...product,
       stock: row.stock,
@@ -504,7 +533,7 @@ export function getProductById(id: string): Product | null {
     | { data: string; stock: number }
     | undefined
   if (!row) return null
-  const product = JSON.parse(row.data) as Product
+  const product = normalizeProduct(JSON.parse(row.data) as LegacyProduct)
   return { ...product, stock: row.stock, inStock: row.stock > 0 }
 }
 

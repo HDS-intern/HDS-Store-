@@ -6,23 +6,35 @@ import { useApp } from '@/lib/context'
 import { SiteLoadingOverlay } from '@/components/SiteLoadingOverlay'
 
 const MIN_ROUTE_LOADING_MS = 350
+const MAX_INITIAL_LOADING_MS = 4000
 
 export function SiteLoadingGate({ children }: { children: React.ReactNode }) {
   const { authLoading } = useApp()
   const pathname = usePathname()
   const [routeLoading, setRouteLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
+  const [forceHideOverlay, setForceHideOverlay] = useState(false)
   const routeStartedAt = useRef<number | null>(null)
 
   useEffect(() => {
-    if (document.readyState === 'complete') {
-      setPageLoading(false)
-      return
+    const dismiss = () => setPageLoading(false)
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      dismiss()
+    } else {
+      document.addEventListener('DOMContentLoaded', dismiss)
+      window.addEventListener('load', dismiss)
     }
 
-    const onReady = () => setPageLoading(false)
-    window.addEventListener('load', onReady)
-    return () => window.removeEventListener('load', onReady)
+    const fallback = window.setTimeout(dismiss, 2500)
+    const hardCap = window.setTimeout(() => setForceHideOverlay(true), MAX_INITIAL_LOADING_MS)
+
+    return () => {
+      document.removeEventListener('DOMContentLoaded', dismiss)
+      window.removeEventListener('load', dismiss)
+      window.clearTimeout(fallback)
+      window.clearTimeout(hardCap)
+    }
   }, [])
 
   useEffect(() => {
@@ -73,7 +85,8 @@ export function SiteLoadingGate({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer)
   }, [pathname, routeLoading])
 
-  const showOverlay = authLoading || pageLoading || routeLoading
+  const showOverlay =
+    !forceHideOverlay && (authLoading || pageLoading || routeLoading)
 
   return (
     <>

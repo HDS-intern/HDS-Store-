@@ -34,8 +34,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Name and price are required' }, { status: 400 })
     }
 
-    if (!product.sku?.trim()) {
-      return NextResponse.json({ error: 'SKU is required' }, { status: 400 })
+    if (!product.modelId?.trim()) {
+      return NextResponse.json({ error: 'Model ID is required' }, { status: 400 })
     }
 
     if (!product.manufacturingId?.trim()) {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       id,
       stock,
       inStock: stock > 0,
-      sku: product.sku.trim(),
+      modelId: product.modelId.trim(),
       manufacturingId: product.manufacturingId.trim(),
       brand: product.brand || 'Hawking Defence',
       images: product.images?.length ? product.images : [product.image],
@@ -112,11 +112,11 @@ export async function PUT(request: Request) {
     const existing = JSON.parse(row.data) as Product
     const stock = updates.stock ?? row.stock
     const merged = { ...existing, ...updates, id, stock, inStock: stock > 0 }
-    const sku = (merged.sku ?? '').trim()
+    const modelId = (merged.modelId ?? (merged as Product & { sku?: string }).sku ?? '').trim()
     const manufacturingId = (merged.manufacturingId ?? '').trim()
 
-    if (!sku) {
-      return NextResponse.json({ error: 'SKU is required' }, { status: 400 })
+    if (!modelId) {
+      return NextResponse.json({ error: 'Model ID is required' }, { status: 400 })
     }
 
     if (!manufacturingId) {
@@ -125,7 +125,7 @@ export async function PUT(request: Request) {
 
     const updated: Product = {
       ...merged,
-      sku,
+      modelId,
       manufacturingId,
     }
 

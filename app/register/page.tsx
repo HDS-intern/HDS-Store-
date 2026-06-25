@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { useApp } from '@/lib/context'
+import { PasswordField } from '@/components/PasswordField'
 import { UserPlus } from 'lucide-react'
 import styles from './page.module.css'
 
@@ -102,24 +103,25 @@ export default function RegisterPage() {
             />
 
             <label htmlFor="password" className={styles.label}>Password *</label>
-            <input
+            <PasswordField
               id="password"
-              type="password"
+              value={form.password}
+              onChange={(password) => setForm({ ...form, password })}
+              placeholder="Create a password"
               required
               minLength={4}
-              className={styles.input}
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              autoComplete="new-password"
             />
 
             <label htmlFor="confirm" className={styles.label}>Confirm Password *</label>
-            <input
+            <PasswordField
               id="confirm"
-              type="password"
-              required
-              className={styles.input}
               value={form.confirmPassword}
-              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              onChange={(confirmPassword) => setForm({ ...form, confirmPassword })}
+              placeholder="Confirm your password"
+              required
+              minLength={4}
+              autoComplete="new-password"
             />
 
             <button type="submit" className={styles.submitBtn} disabled={loading}>

@@ -811,8 +811,8 @@ export default function AdminPage() {
 
   const saveProduct = async () => {
     if (!editProduct) return
-    if (!editProduct.sku?.trim()) {
-      setError('SKU is required')
+    if (!editProduct.modelId?.trim()) {
+      setError('Model ID is required')
       return
     }
     if (!editProduct.manufacturingId?.trim()) {
@@ -825,7 +825,7 @@ export default function AdminPage() {
     const originalPrice = maxPrice > price ? maxPrice : undefined
     const payload = {
       ...editProduct,
-      sku: editProduct.sku.trim(),
+      modelId: editProduct.modelId.trim(),
       manufacturingId: editProduct.manufacturingId.trim(),
       stock,
       price,
@@ -866,7 +866,7 @@ export default function AdminPage() {
     setDiscountInput('0')
     setEditProduct({
       name: '',
-      sku: '',
+      modelId: '',
       manufacturingId: '',
       price: 0,
       stock: 0,
@@ -1146,12 +1146,12 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className={styles.formLabel}>SKU *</label>
+                      <label className={styles.formLabel}>Model ID *</label>
                       <input
                         required
                         className={styles.formInput}
-                        value={editProduct.sku || ''}
-                        onChange={(e) => setEditProduct({ ...editProduct, sku: e.target.value })}
+                        value={editProduct.modelId || ''}
+                        onChange={(e) => setEditProduct({ ...editProduct, modelId: e.target.value })}
                       />
                     </div>
                     <div>
@@ -1166,7 +1166,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className={styles.formLabel}>Max Price (IND)</label>
+                      <label className={styles.formLabel}>Max Price (₹)</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -1189,7 +1189,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className={styles.formLabel}>Discounted Price (IND)</label>
+                      <label className={styles.formLabel}>Discounted Price (₹)</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -1265,7 +1265,7 @@ export default function AdminPage() {
                   <thead>
                     <tr>
                       <AdminTableColumnHeader icon={Package} label="Product" highlighted={highlightedColumn === 'product'} />
-                      <AdminTableColumnHeader icon={Hash} label="SKU / MFG ID" highlighted={highlightedColumn === 'sku'} />
+                      <AdminTableColumnHeader icon={Hash} label="Model ID / MFG ID" highlighted={highlightedColumn === 'modelId'} />
                       <AdminTableColumnHeader icon={TrendingUp} label="Max Price" highlighted={highlightedColumn === 'maxPrice'} />
                       <AdminTableColumnHeader icon={Tag} label="Discounted" highlighted={highlightedColumn === 'discounted'} />
                       <AdminTableColumnHeader icon={Percent} label="Discount" highlighted={highlightedColumn === 'discount'} />
@@ -1290,9 +1290,9 @@ export default function AdminPage() {
                           </button>
                         </td>
                         <td>
-                          <div className={styles.skuCell}>
-                            <span>{p.sku}</span>
-                            <span className={styles.skuSub}>MFG: {p.manufacturingId || '—'}</span>
+                          <div className={styles.modelIdCell}>
+                            <span>{p.modelId}</span>
+                            <span className={styles.modelIdSub}>MFG: {p.manufacturingId || '—'}</span>
                           </div>
                         </td>
                         <td>{formatPrice(getMaxPrice(p))}</td>
@@ -1814,7 +1814,7 @@ export default function AdminPage() {
         <ProductImageModal
           name={previewProduct.name}
           image={previewProduct.image}
-          sku={previewProduct.sku}
+          modelId={previewProduct.modelId}
           manufacturingId={previewProduct.manufacturingId}
           onClose={() => setPreviewProduct(null)}
         />
