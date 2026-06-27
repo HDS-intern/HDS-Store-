@@ -10,7 +10,7 @@ const CUSTOM_TEMPLATE = path.join(TEMPLATE_DIR, 'bulk-order-template.xlsx')
 
 export async function POST(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 

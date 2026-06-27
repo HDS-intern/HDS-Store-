@@ -11,8 +11,8 @@ import {
 
 export const runtime = 'nodejs'
 
-function assertAdmin(request: Request) {
-  requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+async function assertAdmin(request: Request) {
+  requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
 }
 
 function buildDownloadResponse() {
@@ -38,7 +38,7 @@ function buildDownloadResponse() {
 
 export async function GET(request: Request) {
   try {
-    assertAdmin(request)
+    await assertAdmin(request)
     return buildDownloadResponse()
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    assertAdmin(request)
+    await assertAdmin(request)
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 

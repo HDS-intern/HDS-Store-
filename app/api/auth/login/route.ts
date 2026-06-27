@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Username/email and password are required' }, { status: 400 })
     }
 
-    const user = getUserByLogin(login.trim())
+    const user = await getUserByLogin(login.trim())
     if (!user || !verifyPassword(password, user.password_hash)) {
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
     }
@@ -26,10 +26,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const token = createSession(user.id)
+    const token = await createSession(user.id)
 
     if (user.role === 'staff') {
-      recordStaffLogin(user.id)
+      await recordStaffLogin(user.id)
     }
 
     return NextResponse.json({ token, user: dbUserToUser(user) })

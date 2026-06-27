@@ -7,11 +7,11 @@ export const runtime = 'nodejs'
 export async function POST(request: Request) {
   const token = getTokenFromRequest(request)
   if (token) {
-    const user = getUserBySession(token)
+    const user = await getUserBySession(token)
     if (user?.role === 'staff') {
-      recordStaffLogout(user.id)
+      await recordStaffLogout(user.id)
     }
-    deleteSession(token)
+    await deleteSession(token)
   }
   return NextResponse.json({ success: true })
 }

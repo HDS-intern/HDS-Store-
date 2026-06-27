@@ -29,6 +29,49 @@ function toneClass(tone: AnimatedFormSelectOption['tone']) {
   return styles.badgeDefault
 }
 
+type MenuPosition = {
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+}
+
+function computeMenuPosition(trigger: HTMLButtonElement): MenuPosition {
+  const rect = trigger.getBoundingClientRect()
+  const viewportPadding = 8
+  const gap = 6
+  const minWidth = 240
+  const width = Math.max(rect.width, minWidth)
+
+  let left = rect.left
+  if (left + width > window.innerWidth - viewportPadding) {
+    left = window.innerWidth - width - viewportPadding
+  }
+  left = Math.max(viewportPadding, left)
+
+  const spaceBelow = window.innerHeight - rect.bottom - viewportPadding
+  const spaceAbove = rect.top - viewportPadding
+  const openUpward = spaceBelow < 180 && spaceAbove > spaceBelow
+
+  if (openUpward) {
+    const maxHeight = Math.min(280, Math.max(120, spaceAbove - gap))
+    return {
+      top: Math.max(viewportPadding, rect.top - gap - maxHeight),
+      left,
+      width,
+      maxHeight,
+    }
+  }
+
+  const maxHeight = Math.min(280, Math.max(120, spaceBelow - gap))
+  return {
+    top: rect.bottom + gap,
+    left,
+    width,
+    maxHeight,
+  }
+}
+
 export function AnimatedFormSelect({
   value,
   options,
@@ -40,7 +83,7 @@ export function AnimatedFormSelect({
 }: AnimatedFormSelectProps) {
   const isCell = variant === 'cell'
   const [open, setOpen] = useState(false)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0 })
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const selected = options.find((option) => option.value === value) ?? options[0]
 
@@ -66,13 +109,25 @@ export function AnimatedFormSelect({
   const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current
     if (!trigger) return
-    const rect = trigger.getBoundingClientRect()
-    setMenuPosition({
-      top: rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
-    })
+    setMenuPosition(computeMenuPosition(trigger))
   }, [])
+
+  const closeMenu = useCallback(() => {
+    setOpen(false)
+    setMenuPosition(null)
+  }, [])
+
+  const toggleMenu = useCallback(() => {
+    if (disabled) return
+    if (open) {
+      closeMenu()
+      return
+    }
+    const trigger = triggerRef.current
+    if (!trigger) return
+    setMenuPosition(computeMenuPosition(trigger))
+    setOpen(true)
+  }, [closeMenu, disabled, open])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -93,20 +148,20 @@ export function AnimatedFormSelect({
   useEffect(() => {
     if (!open) return
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') closeMenu()
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [open])
+  }, [closeMenu, open])
 
   const menu =
-    open && typeof document !== 'undefined'
+    open && menuPosition && typeof document !== 'undefined'
       ? createPortal(
           <>
             <button
               type="button"
               className={styles.backdrop}
-              onClick={() => setOpen(false)}
+              onClick={closeMenu}
               aria-label="Close menu"
             />
             <ul
@@ -116,7 +171,8 @@ export function AnimatedFormSelect({
               style={{
                 top: menuPosition.top,
                 left: menuPosition.left,
-                width: Math.max(menuPosition.width, 240),
+                width: menuPosition.width,
+                maxHeight: menuPosition.maxHeight,
               }}
             >
               {options.map((option, index) => {
@@ -134,7 +190,7 @@ export function AnimatedFormSelect({
                       className={`${styles.option} ${isActive ? styles.optionActive : ''}`}
                       onClick={() => {
                         onChange(option.value)
-                        setOpen(false)
+                        closeMenu()
                       }}
                     >
                       <span className={styles.optionContent}>
@@ -161,7 +217,7 @@ export function AnimatedFormSelect({
         id={id}
         type="button"
         className={`${styles.trigger} ${isCell ? styles.triggerCell : ''} ${open ? styles.triggerOpen : ''}`}
-        onClick={() => !disabled && setOpen((prev) => !prev)}
+        onClick={toggleMenu}
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}

@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import { getDb } from './db'
+import { query, queryOne, execute } from './db'
 
 export type ContactMessage = {
   id: string
@@ -36,28 +36,28 @@ function rowToMessage(row: ContactMessageRow): ContactMessage {
   }
 }
 
-export function createContactMessage(input: {
+export async function createContactMessage(input: {
   name: string
   email: string
   phone?: string
   subject: string
   message: string
-}): ContactMessage {
-  const db = getDb()
+}): Promise<ContactMessage> {
   const id = `MSG-${Date.now()}${randomBytes(3).toString('hex')}`
   const createdAt = new Date().toISOString()
 
-  db.prepare(
+  await execute(
     `INSERT INTO contact_messages (id, name, email, phone, subject, message, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    input.name.trim(),
-    input.email.trim(),
-    input.phone?.trim() || null,
-    input.subject.trim(),
-    input.message.trim(),
-    createdAt
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      input.name.trim(),
+      input.email.trim(),
+      input.phone?.trim() || null,
+      input.subject.trim(),
+      input.message.trim(),
+      createdAt,
+    ]
   )
 
   return {
@@ -72,34 +72,33 @@ export function createContactMessage(input: {
   }
 }
 
-export function countUnreadContactMessages(): number {
-  const db = getDb()
-  const row = db
-    .prepare('SELECT COUNT(*) AS count FROM contact_messages WHERE read_at IS NULL')
-    .get() as { count: number }
-  return row.count ?? 0
+export async function countUnreadContactMessages(): Promise<number> {
+  const row = await queryOne<{ count: number }>(
+    'SELECT COUNT(*)::int AS count FROM contact_messages WHERE read_at IS NULL'
+  )
+  return row?.count ?? 0
 }
 
-export function markAllContactMessagesRead(): number {
-  const db = getDb()
+export async function markAllContactMessagesRead(): Promise<number> {
   const now = new Date().toISOString()
-  const result = db
-    .prepare('UPDATE contact_messages SET read_at = ? WHERE read_at IS NULL')
-    .run(now)
-  return result.changes
+  const rows = await query<{ id: string }>(
+    'UPDATE contact_messages SET read_at = ? WHERE read_at IS NULL RETURNING id',
+    [now]
+  )
+  return rows.length
 }
 
-export function listContactMessages(): ContactMessage[] {
-  const db = getDb()
-  const rows = db
-    .prepare('SELECT * FROM contact_messages ORDER BY created_at DESC')
-    .all() as ContactMessageRow[]
-
+export async function listContactMessages(): Promise<ContactMessage[]> {
+  const rows = await query<ContactMessageRow>(
+    'SELECT * FROM contact_messages ORDER BY created_at DESC'
+  )
   return rows.map(rowToMessage)
 }
 
-export function deleteContactMessage(id: string): boolean {
-  const db = getDb()
-  const result = db.prepare('DELETE FROM contact_messages WHERE id = ?').run(id)
-  return result.changes > 0
+export async function deleteContactMessage(id: string): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    'DELETE FROM contact_messages WHERE id = ? RETURNING id',
+    [id]
+  )
+  return rows.length > 0
 }

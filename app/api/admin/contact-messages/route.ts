@@ -11,9 +11,9 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
-    const messages = listContactMessages()
-    const unreadCount = countUnreadContactMessages()
+    requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
+    const messages = await listContactMessages()
+    const unreadCount = await countUnreadContactMessages()
     return NextResponse.json(
       { messages, unreadCount },
       { headers: { 'Cache-Control': 'no-store' } }
@@ -27,13 +27,17 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     const body = await request.json().catch(() => ({}))
     if (body.action !== 'mark_read') {
       return NextResponse.json({ error: 'Unsupported action' }, { status: 400 })
     }
-    const marked = markAllContactMessagesRead()
-    return NextResponse.json({ success: true, marked, unreadCount: countUnreadContactMessages() })
+    const marked = await markAllContactMessagesRead()
+    return NextResponse.json({
+      success: true,
+      marked,
+      unreadCount: await countUnreadContactMessages(),
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     const status = msg === 'Unauthorized' ? 401 : 500
@@ -43,21 +47,21 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     const body = await request.json().catch(() => ({}))
     const id = typeof body.id === 'string' ? body.id.trim() : ''
     if (!id) {
       return NextResponse.json({ error: 'Message ID required' }, { status: 400 })
     }
 
-    const deleted = deleteContactMessage(id)
+    const deleted = await deleteContactMessage(id)
     if (!deleted) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 })
     }
 
     return NextResponse.json({
       success: true,
-      unreadCount: countUnreadContactMessages(),
+      unreadCount: await countUnreadContactMessages(),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'

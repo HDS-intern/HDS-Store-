@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { getDb } from './db'
+import { query, execute } from './db'
 import type { ReturnRequest } from './types'
 
 export const RETURN_REQUESTS_DIR = path.join(process.cwd(), 'data', 'return-requests')
@@ -35,16 +35,14 @@ function rowToReturn(row: ReturnRequestRow): ReturnRequest {
   }
 }
 
-export function listReturnRequests(): ReturnRequest[] {
-  const db = getDb()
-  const rows = db
-    .prepare('SELECT * FROM return_requests ORDER BY created_at DESC')
-    .all() as ReturnRequestRow[]
-
+export async function listReturnRequests(): Promise<ReturnRequest[]> {
+  const rows = await query<ReturnRequestRow>(
+    'SELECT * FROM return_requests ORDER BY created_at DESC'
+  )
   return rows.map(rowToReturn)
 }
 
-export function createReturnRequest(input: {
+export async function createReturnRequest(input: {
   userId: string
   orderId: string
   productId: string
@@ -54,8 +52,7 @@ export function createReturnRequest(input: {
   reason: string
   documentBuffer: Buffer
   documentName: string
-}): ReturnRequest {
-  const db = getDb()
+}): Promise<ReturnRequest> {
   const id = `RR-${Date.now()}${randomBytes(3).toString('hex')}`
   const createdAt = new Date().toISOString()
 
@@ -65,27 +62,29 @@ export function createReturnRequest(input: {
   const documentPath = path.join(RETURN_REQUESTS_DIR, storedName)
   fs.writeFileSync(documentPath, input.documentBuffer)
 
-  db.prepare(
+  await execute(
     `INSERT INTO return_requests
      (id, user_id, order_id, product_id, product_name, customer_name, customer_email, reason, document_path, document_name, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    input.userId,
-    input.orderId,
-    input.productId,
-    input.productName.trim(),
-    input.customerName.trim(),
-    input.customerEmail.trim(),
-    input.reason.trim(),
-    documentPath,
-    input.documentName.trim(),
-    createdAt
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      input.userId,
+      input.orderId,
+      input.productId,
+      input.productName.trim(),
+      input.customerName.trim(),
+      input.customerEmail.trim(),
+      input.reason.trim(),
+      documentPath,
+      input.documentName.trim(),
+      createdAt,
+    ]
   )
 
-  db.prepare(
-    'UPDATE orders SET returned_qty = COALESCE(returned_qty, 0) + 1 WHERE id = ?'
-  ).run(input.orderId)
+  await execute(
+    'UPDATE orders SET returned_qty = COALESCE(returned_qty, 0) + 1 WHERE id = ?',
+    [input.orderId]
+  )
 
   return {
     id,

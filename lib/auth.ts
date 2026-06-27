@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
-import { getDb, dbUserToUser, type DbUser } from './db'
+import { query, queryOne, execute, dbUserToUser, type DbUser } from './db'
 import type { User } from './types'
 import type { PermissionKey } from './permissions'
 import { hasPermission } from './permissions'
@@ -15,56 +15,52 @@ export function verifyPassword(password: string, hash: string): boolean {
   return bcrypt.compareSync(password, hash)
 }
 
-export function createSession(userId: string): string {
-  const db = getDb()
+export async function createSession(userId: string): Promise<string> {
   const token = randomBytes(32).toString('hex')
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + SESSION_DAYS)
 
-  db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(
+  await execute('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)', [
     token,
     userId,
-    expiresAt.toISOString()
-  )
+    expiresAt.toISOString(),
+  ])
 
   return token
 }
 
-export function deleteSession(token: string): void {
-  const db = getDb()
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+export async function deleteSession(token: string): Promise<void> {
+  await execute('DELETE FROM sessions WHERE token = ?', [token])
 }
 
-export function getUserBySession(token: string | null): User | null {
+export async function getUserBySession(token: string | null): Promise<User | null> {
   if (!token) return null
 
-  const db = getDb()
-  const session = db
-    .prepare('SELECT user_id, expires_at FROM sessions WHERE token = ?')
-    .get(token) as { user_id: string; expires_at: string } | undefined
+  const session = await queryOne<{ user_id: string; expires_at: string }>(
+    'SELECT user_id, expires_at FROM sessions WHERE token = ?',
+    [token]
+  )
 
   if (!session) return null
   if (new Date(session.expires_at) < new Date()) {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+    await execute('DELETE FROM sessions WHERE token = ?', [token])
     return null
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id) as
-    | DbUser
-    | undefined
+  const user = await queryOne<DbUser>('SELECT * FROM users WHERE id = ?', [session.user_id])
   if (!user) return null
   if (user.access_locked) {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+    await execute('DELETE FROM sessions WHERE token = ?', [token])
     return null
   }
   return dbUserToUser(user)
 }
 
-export function getUserByLogin(login: string): DbUser | null {
-  const db = getDb()
-  const user = db
-    .prepare('SELECT * FROM users WHERE username = ? OR email = ?')
-    .get(login, login) as DbUser | undefined
+export async function getUserByLogin(login: string): Promise<DbUser | null> {
+  const user = await queryOne<DbUser>(
+    'SELECT * FROM users WHERE username = ? OR email = ?',
+    [login, login]
+  )
   return user ?? null
 }
 

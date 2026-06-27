@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { getDb } from './db'
+import { query, queryOne, execute } from './db'
 import type { ChatChannel, ChatMessage, ChatSender, ChatThreadSummary } from './chatTypes'
 
 type ChatRow = {
@@ -24,33 +24,34 @@ function rowToMessage(row: ChatRow): ChatMessage {
   }
 }
 
-export function listChatMessages(userId: string, channel: ChatChannel): ChatMessage[] {
-  const db = getDb()
-  const rows = db
-    .prepare(
-      `SELECT id, user_id, channel, sender, body, created_at, read_at
-       FROM chat_messages
-       WHERE user_id = ? AND channel = ?
-       ORDER BY created_at ASC`
-    )
-    .all(userId, channel) as ChatRow[]
+export async function listChatMessages(
+  userId: string,
+  channel: ChatChannel
+): Promise<ChatMessage[]> {
+  const rows = await query<ChatRow>(
+    `SELECT id, user_id, channel, sender, body, created_at, read_at
+     FROM chat_messages
+     WHERE user_id = ? AND channel = ?
+     ORDER BY created_at ASC`,
+    [userId, channel]
+  )
   return rows.map(rowToMessage)
 }
 
-export function insertChatMessage(input: {
+export async function insertChatMessage(input: {
   userId: string
   channel: ChatChannel
   sender: ChatSender
   body: string
-}): ChatMessage {
-  const db = getDb()
+}): Promise<ChatMessage> {
   const id = randomUUID()
   const createdAt = new Date().toISOString()
 
-  db.prepare(
+  await execute(
     `INSERT INTO chat_messages (id, user_id, channel, sender, body, created_at, read_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL)`
-  ).run(id, input.userId, input.channel, input.sender, input.body.trim(), createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+    [id, input.userId, input.channel, input.sender, input.body.trim(), createdAt]
+  )
 
   return {
     id,
@@ -62,55 +63,53 @@ export function insertChatMessage(input: {
   }
 }
 
-export function markSupportMessagesRead(userId: string, forSender: 'customer' | 'staff') {
-  const db = getDb()
+export async function markSupportMessagesRead(
+  userId: string,
+  forSender: 'customer' | 'staff'
+): Promise<void> {
   const targetSender = forSender === 'customer' ? 'staff' : 'customer'
-  db.prepare(
+  await execute(
     `UPDATE chat_messages
      SET read_at = ?
-     WHERE user_id = ? AND channel = 'support' AND sender = ? AND read_at IS NULL`
-  ).run(new Date().toISOString(), userId, targetSender)
+     WHERE user_id = ? AND channel = 'support' AND sender = ? AND read_at IS NULL`,
+    [new Date().toISOString(), userId, targetSender]
+  )
 }
 
-export function countUnreadSupportForCustomer(userId: string): number {
-  const db = getDb()
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) as c FROM chat_messages
-       WHERE user_id = ? AND channel = 'support' AND sender = 'staff' AND read_at IS NULL`
-    )
-    .get(userId) as { c: number }
-  return row.c ?? 0
+export async function countUnreadSupportForCustomer(userId: string): Promise<number> {
+  const row = await queryOne<{ c: number }>(
+    `SELECT COUNT(*)::int AS c FROM chat_messages
+     WHERE user_id = ? AND channel = 'support' AND sender = 'staff' AND read_at IS NULL`,
+    [userId]
+  )
+  return row?.c ?? 0
 }
 
-export function listSupportThreads(): ChatThreadSummary[] {
-  const db = getDb()
-  const rows = db
-    .prepare(
-      `SELECT m.user_id, u.name AS customer_name, u.email AS customer_email,
-              m.body AS last_message, m.created_at AS last_message_at,
-              (
-                SELECT COUNT(*) FROM chat_messages um
-                WHERE um.user_id = m.user_id AND um.channel = 'support'
-                  AND um.sender = 'customer' AND um.read_at IS NULL
-              ) AS unread_count
-       FROM chat_messages m
-       JOIN users u ON u.id = m.user_id
-       WHERE m.channel = 'support'
-         AND m.created_at = (
-           SELECT MAX(created_at) FROM chat_messages
-           WHERE user_id = m.user_id AND channel = 'support'
-         )
-       ORDER BY m.created_at DESC`
-    )
-    .all() as {
+export async function listSupportThreads(): Promise<ChatThreadSummary[]> {
+  const rows = await query<{
     user_id: string
     customer_name: string
     customer_email: string
     last_message: string
     last_message_at: string
     unread_count: number
-  }[]
+  }>(
+    `SELECT m.user_id, u.name AS customer_name, u.email AS customer_email,
+            m.body AS last_message, m.created_at AS last_message_at,
+            (
+              SELECT COUNT(*)::int FROM chat_messages um
+              WHERE um.user_id = m.user_id AND um.channel = 'support'
+                AND um.sender = 'customer' AND um.read_at IS NULL
+            ) AS unread_count
+     FROM chat_messages m
+     JOIN users u ON u.id = m.user_id
+     WHERE m.channel = 'support'
+       AND m.created_at = (
+         SELECT MAX(created_at) FROM chat_messages
+         WHERE user_id = m.user_id AND channel = 'support'
+       )
+     ORDER BY m.created_at DESC`
+  )
 
   return rows.map((row) => ({
     userId: row.user_id,
@@ -122,40 +121,34 @@ export function listSupportThreads(): ChatThreadSummary[] {
   }))
 }
 
-export function countUnreadSupportThreads(): number {
-  const db = getDb()
-  const row = db
-    .prepare(
-      `SELECT COUNT(DISTINCT user_id) as c FROM chat_messages
-       WHERE channel = 'support' AND sender = 'customer' AND read_at IS NULL`
-    )
-    .get() as { c: number }
-  return row.c ?? 0
+export async function countUnreadSupportThreads(): Promise<number> {
+  const row = await queryOne<{ c: number }>(
+    `SELECT COUNT(DISTINCT user_id)::int AS c FROM chat_messages
+     WHERE channel = 'support' AND sender = 'customer' AND read_at IS NULL`
+  )
+  return row?.c ?? 0
 }
 
-export function countUnreadCustomerChatMessages(): number {
-  const db = getDb()
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) as c FROM chat_messages
-       WHERE channel = 'support' AND sender = 'customer' AND read_at IS NULL`
-    )
-    .get() as { c: number }
-  return row.c ?? 0
+export async function countUnreadCustomerChatMessages(): Promise<number> {
+  const row = await queryOne<{ c: number }>(
+    `SELECT COUNT(*)::int AS c FROM chat_messages
+     WHERE channel = 'support' AND sender = 'customer' AND read_at IS NULL`
+  )
+  return row?.c ?? 0
 }
 
-export function deleteSupportChatMessage(messageId: string): boolean {
-  const db = getDb()
-  const result = db
-    .prepare(`DELETE FROM chat_messages WHERE id = ? AND channel = 'support'`)
-    .run(messageId)
-  return result.changes > 0
+export async function deleteSupportChatMessage(messageId: string): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `DELETE FROM chat_messages WHERE id = ? AND channel = 'support' RETURNING id`,
+    [messageId]
+  )
+  return rows.length > 0
 }
 
-export function deleteSupportThread(userId: string): number {
-  const db = getDb()
-  const result = db
-    .prepare(`DELETE FROM chat_messages WHERE user_id = ? AND channel = 'support'`)
-    .run(userId)
-  return result.changes
+export async function deleteSupportThread(userId: string): Promise<number> {
+  const rows = await query<{ id: string }>(
+    `DELETE FROM chat_messages WHERE user_id = ? AND channel = 'support' RETURNING id`,
+    [userId]
+  )
+  return rows.length
 }

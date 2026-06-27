@@ -8,7 +8,10 @@ import { AdminShell, type AdminTab } from '@/components/admin/AdminShell'
 import { AdminSlideUp } from '@/components/admin/AdminSlideUp'
 import { AdminDashboard } from '@/components/admin/AdminDashboard'
 import { startAdminEntranceOnce, completeAdminEntrance } from '@/lib/adminEntrance'
-import { CertificationPanel } from '@/components/admin/CertificationPanel'
+import {
+  CertificationAssetViewModal,
+  type CertificationAssetPreview,
+} from '@/components/admin/CertificationAssetViewModal'
 import { BulkOrderTemplatePanel } from '@/components/admin/BulkOrderTemplatePanel'
 import { TermsAgreementTemplatePanel } from '@/components/admin/TermsAgreementTemplatePanel'
 import { InvoiceDcTemplatePanel } from '@/components/admin/InvoiceDcTemplatePanel'
@@ -33,7 +36,8 @@ import { UserAccessToggle } from '@/components/admin/UserAccessToggle'
 import { CustomerDetailsModal } from '@/components/admin/CustomerDetailsModal'
 import { OrderDetailsModal } from '@/components/admin/OrderDetailsModal'
 import { ProductImageModal } from '@/components/admin/ProductImageModal'
-import { ProductCertificationModal } from '@/components/admin/ProductCertificationModal'
+import { AnimatedFormSelect } from '@/components/admin/AnimatedFormSelect'
+import { CertificationTypeManagerModal } from '@/components/admin/CertificationTypeManagerModal'
 import {
   ProductBulkEntryModal,
   createEmptyProductDraftRow,
@@ -54,6 +58,11 @@ import {
   syncPricingFields,
   type PricingField,
 } from '@/lib/productPricing'
+import {
+  certDraftEntriesToProductCertifications,
+  certificationTypesLabel,
+  getProductCertifications,
+} from '@/lib/productCertifications'
 import {
   detectOrderNotifications,
   toOrderSnapshot,
@@ -80,6 +89,11 @@ import {
   type UserPermissions,
 } from '@/lib/permissions'
 import type { Product, Order, User, StaffRecord, WarrantyInfo } from '@/lib/types'
+import type { CertificationTypeRecord } from '@/lib/certificationTypes'
+import {
+  buildCertificationTypeOptions,
+  CREATE_CERT_VALUE,
+} from '@/lib/certificationTypeOptions'
 
 const WARRANTY_DURATION_OPTIONS = ['1 Year', '2 Years', '3 Years'] as const
 
@@ -135,6 +149,7 @@ import {
   ImageIcon,
   X,
   Trash2,
+  Pencil,
 } from 'lucide-react'
 import styles from './page.module.css'
 
@@ -142,6 +157,12 @@ type DbOrder = Order & {
   createdAt: string | Date
   customerName?: string
   customerUsername?: string
+}
+
+function getProductCertificationType(product: Product): string {
+  const value = product.specs?.['Certification Type']?.trim()
+  if (!value || value === '—') return ''
+  return value
 }
 
 const STAFF_ROLES = [
@@ -607,6 +628,13 @@ export default function AdminPage() {
   } | null>(null)
   const [viewPaymentOrder, setViewPaymentOrder] = useState<DbOrder | null>(null)
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null)
+  const [certificationTypes, setCertificationTypes] = useState<CertificationTypeRecord[]>([])
+  const [editCertOptions, setEditCertOptions] = useState(() => buildCertificationTypeOptions([]))
+  const [editCertificationType, setEditCertificationType] = useState('')
+  const [editCertificationLogo, setEditCertificationLogo] = useState('')
+  const [showEditCertTypeManager, setShowEditCertTypeManager] = useState(false)
+  const [inventoryCertPreview, setInventoryCertPreview] =
+    useState<CertificationAssetPreview | null>(null)
 
   const [editProduct, setEditProduct] = useState<Partial<Product> | null>(null)
   const [newProduct, setNewProduct] = useState(false)
@@ -614,15 +642,29 @@ export default function AdminPage() {
   const [bulkImageDrafts, setBulkImageDrafts] = useState<BulkProductImageDraft[] | null>(null)
   const [bulkImagesUploadingRowId, setBulkImagesUploadingRowId] = useState<string | null>(null)
   const [bulkSaving, setBulkSaving] = useState(false)
-  const [showCertModal, setShowCertModal] = useState(false)
-  const [certDraftImage, setCertDraftImage] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const productImageInputRef = useRef<HTMLInputElement>(null)
-  const certificationImageInputRef = useRef<HTMLInputElement>(null)
+  const editCertDocumentInputRef = useRef<HTMLInputElement>(null)
   const [stockInput, setStockInput] = useState('')
   const [maxPriceInput, setMaxPriceInput] = useState('')
   const [discountedPriceInput, setDiscountedPriceInput] = useState('')
   const [discountInput, setDiscountInput] = useState('')
+
+  const syncEditCertOptions = (types: CertificationTypeRecord[]) => {
+    setCertificationTypes(types)
+    setEditCertOptions(buildCertificationTypeOptions(types))
+  }
+
+  const loadCertificationTypes = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ certificationTypes: CertificationTypeRecord[] }>(
+        '/api/admin/certification-types'
+      )
+      syncEditCertOptions(Array.isArray(data.certificationTypes) ? data.certificationTypes : [])
+    } catch {
+      syncEditCertOptions([])
+    }
+  }, [])
 
   const handlePricingChange = (source: PricingField, field: 'max' | 'discount' | 'sale', raw: string) => {
     if (raw !== '' && !/^\d+$/.test(raw)) return
@@ -871,6 +913,20 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
+    if (tab !== 'inventory' && !editProduct) return
+    void loadCertificationTypes()
+  }, [tab, editProduct, loadCertificationTypes])
+
+  useEffect(() => {
+    if (!editCertificationType) {
+      setEditCertificationLogo('')
+      return
+    }
+    const match = certificationTypes.find((item) => item.type === editCertificationType)
+    setEditCertificationLogo(match?.logoUrl ?? '')
+  }, [certificationTypes, editCertificationType])
+
+  useEffect(() => {
     if (authLoading) return
     if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
       router.replace('/login?admin=1')
@@ -1056,6 +1112,10 @@ export default function AdminPage() {
       price,
       originalPrice,
       inStock: stock > 0,
+      specs: {
+        ...(editProduct.specs || {}),
+        'Certification Type': editCertificationType || '—',
+      },
     }
     try {
       if (newProduct) {
@@ -1073,6 +1133,9 @@ export default function AdminPage() {
       }
       setEditProduct(null)
       setNewProduct(false)
+      setEditCertificationType('')
+      setEditCertificationLogo('')
+      setShowEditCertTypeManager(false)
       setStockInput('')
       setMaxPriceInput('')
       setDiscountedPriceInput('')
@@ -1087,19 +1150,22 @@ export default function AdminPage() {
     setNewProduct(true)
     setEditProduct(null)
     setProductDraftRows([createEmptyProductDraftRow()])
-    setShowCertModal(false)
-    setCertDraftImage(null)
+    setEditCertificationType('')
+    setEditCertificationLogo('')
+    setShowEditCertTypeManager(false)
   }
 
   const openEditProduct = (product: Product) => {
     setNewProduct(false)
-    setShowCertModal(false)
-    setCertDraftImage(null)
+    const certType = getProductCertificationType(product)
+    setEditCertificationType(certType)
+    setShowEditCertTypeManager(false)
     setStockInput(String(product.stock ?? 0))
     setMaxPriceInput(String(getMaxPrice(product)))
     setDiscountedPriceInput(String(product.price ?? 0))
     setDiscountInput(String(getDiscountPercent(product)))
     setEditProduct({ ...product })
+    void loadCertificationTypes()
   }
 
   const closeProductEditor = () => {
@@ -1109,8 +1175,9 @@ export default function AdminPage() {
     setBulkImageDrafts(null)
     setBulkImagesUploadingRowId(null)
     setBulkSaving(false)
-    setShowCertModal(false)
-    setCertDraftImage(null)
+    setEditCertificationType('')
+    setEditCertificationLogo('')
+    setShowEditCertTypeManager(false)
     setStockInput('')
     setMaxPriceInput('')
     setDiscountedPriceInput('')
@@ -1152,31 +1219,38 @@ export default function AdminPage() {
     }
   }
 
-  const handleCertificationImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEditCertDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !editProduct) return
 
     setImageUploading(true)
     try {
-      const url = await uploadProductFile(file)
-      setCertDraftImage(url)
+      const url = await uploadCertificationDocument(file)
+      setEditProduct({ ...editProduct, certificationImage: url })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Certification upload failed')
+      setError(err instanceof Error ? err.message : 'Certificate upload failed')
     } finally {
       e.target.value = ''
       setImageUploading(false)
     }
   }
 
-  const saveCertification = () => {
-    if (!editProduct || !certDraftImage) return
-    setEditProduct({ ...editProduct, certificationImage: certDraftImage })
-    setShowCertModal(false)
+  const handleEditCertTypeChange = (value: string) => {
+    if (value === CREATE_CERT_VALUE) {
+      setShowEditCertTypeManager(true)
+      return
+    }
+    setEditCertificationType(value)
+    const match = certificationTypes.find((item) => item.type === value)
+    setEditCertificationLogo(match?.logoUrl ?? '')
   }
 
-  const closeCertificationModal = () => {
-    setShowCertModal(false)
-    setCertDraftImage(null)
+  const handleEditCertTypesUpdated = (types: CertificationTypeRecord[]) => {
+    syncEditCertOptions(types)
+    if (editCertificationType && !types.some((item) => item.type === editCertificationType)) {
+      setEditCertificationType('')
+      setEditCertificationLogo('')
+    }
   }
 
   const uploadCertificationDocument = async (file: File): Promise<string> => {
@@ -1195,15 +1269,21 @@ export default function AdminPage() {
     return data.url
   }
 
-  const handleBulkCertDocumentUpload = async (rowId: string, file: File) => {
+  const handleBulkCertDocumentUpload = async (rowId: string, certEntryId: string, file: File) => {
     setImageUploading(true)
     try {
       const url = await uploadCertificationDocument(file)
       setProductDraftRows(
         (prev) =>
-          prev?.map((row) =>
-            row.id === rowId ? { ...row, certificationDocument: url } : row
-          ) ?? null
+          prev?.map((row) => {
+            if (row.id !== rowId) return row
+            return {
+              ...row,
+              certifications: row.certifications.map((entry) =>
+                entry.id === certEntryId ? { ...entry, documentUrl: url } : entry
+              ),
+            }
+          }) ?? null
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Certificate upload failed')
@@ -1312,6 +1392,8 @@ export default function AdminPage() {
           row.finalPrice === '' ? 0 : Math.max(0, parseInt(row.finalPrice, 10) || 0)
         const mrp = row.mrp === '' ? price : Math.max(0, parseInt(row.mrp, 10) || 0)
         const originalPrice = mrp > price ? mrp : undefined
+        const certifications = certDraftEntriesToProductCertifications(row.certifications)
+        const primaryCertification = certifications[0]
 
         await apiFetch('/api/admin/products', {
           method: 'POST',
@@ -1333,9 +1415,11 @@ export default function AdminPage() {
               'Base Price': basePrice > 0 ? `₹${basePrice.toLocaleString('en-IN')}` : '—',
               'Min Stock Qty': String(minStockQty),
               Specification: row.specification || '—',
-              'Certification Type': row.certificationType || '—',
+              'Certification Type': primaryCertification?.type || '—',
+              'Certification Types': certificationTypesLabel(certifications),
             },
-            certificationImage: row.certificationDocument || undefined,
+            certificationImage: primaryCertification?.documentUrl,
+            certifications,
             rating: 4.5,
             reviews: 0,
             warranty: defaultProductWarranty(),
@@ -1552,7 +1636,6 @@ export default function AdminPage() {
       { id: 'staff-data', label: 'Staff Records', icon: ClipboardList },
       { id: 'messages', label: 'Ticket Generation', icon: Ticket },
       { id: 'customer-chat', label: 'Customer Chat', icon: MessageCircle },
-      { id: 'certification', label: 'Certification', icon: Award },
       { id: 'template', label: 'Edit Template', icon: FileSpreadsheet },
     ] satisfies AdminNavItem[]
   )
@@ -1569,7 +1652,6 @@ export default function AdminPage() {
       if (item.id === 'staff-data') return canViewStaffRecords
       if (item.id === 'messages') return isFullAdmin
       if (item.id === 'customer-chat') return user.role === 'admin' || user.role === 'staff'
-      if (item.id === 'certification') return isFullAdmin
       if (item.id === 'template') return isFullAdmin
       return true
     })
@@ -1633,21 +1715,43 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
+              <div className={`${styles.tableWrap} ${styles.inventoryTableWrap}`}>
+                <table className={`${styles.table} ${styles.inventoryTable}`}>
+                  <colgroup>
+                    <col className={styles.inventoryColProduct} />
+                    <col className={styles.inventoryColSku} />
+                    <col className={styles.inventoryColPrice} />
+                    <col className={styles.inventoryColPrice} />
+                    <col className={styles.inventoryColNumeric} />
+                    <col className={styles.inventoryColNumeric} />
+                    <col className={styles.inventoryColMinAlert} />
+                    <col className={styles.inventoryColStatus} />
+                    <col className={styles.inventoryColCert} />
+                    <col className={styles.inventoryColActions} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <AdminTableColumnHeader label="Product" highlighted={highlightedColumn === 'product'} />
-                      <AdminTableColumnHeader label="SKU ID / MFG ID" highlighted={highlightedColumn === 'modelId'} />
-                      <AdminTableColumnHeader label="Max Price" highlighted={highlightedColumn === 'maxPrice'} />
-                      <AdminTableColumnHeader label="Discounted" highlighted={highlightedColumn === 'discounted'} />
-                      <AdminTableColumnHeader label="Discount" highlighted={highlightedColumn === 'discount'} />
+                      <AdminTableColumnHeader
+                        label="SKU / MFG"
+                        highlighted={highlightedColumn === 'modelId'}
+                        wrap
+                      />
+                      <AdminTableColumnHeader label="Max Price" highlighted={highlightedColumn === 'maxPrice'} wrap />
+                      <AdminTableColumnHeader label="Discounted" highlighted={highlightedColumn === 'discounted'} wrap />
+                      <AdminTableColumnHeader label="Discount" highlighted={highlightedColumn === 'discount'} wrap />
                       <AdminTableColumnHeader label="Stock" highlighted={highlightedColumn === 'stock'} />
                       <AdminTableColumnHeader
-                        label="Minimum Stock Alert"
+                        label="Min Stock Alert"
                         highlighted={highlightedColumn === 'minStockAlert'}
+                        wrap
                       />
                       <AdminTableColumnHeader label="Status" highlighted={highlightedColumn === 'status'} />
+                      <AdminTableColumnHeader
+                        label="Certification"
+                        highlighted={highlightedColumn === 'certification'}
+                        wrap
+                      />
                       <AdminTableColumnHeader label="Actions" highlighted={highlightedColumn === 'actions'} />
                     </tr>
                   </thead>
@@ -1655,48 +1759,115 @@ export default function AdminPage() {
                     {products.map((p) => {
                       const discount = getDiscountPercent(p)
                       const minStockAlert = getMinStockAlert(p)
+                      const productCertifications = getProductCertifications(p)
                       return (
                       <tr key={p.id}>
                         <td>
                           <button
                             type="button"
-                            className={styles.productNameBtn}
+                            className={`${styles.productNameBtn} ${styles.inventoryProductName}`}
                             onClick={() => setPreviewProduct(p)}
-                            title="View product image"
+                            title={p.name}
                           >
                             {p.name}
                           </button>
                         </td>
-                        <td>
+                        <td className={styles.inventorySkuCell}>
                           <div className={styles.modelIdCell}>
-                            <span>{p.modelId}</span>
-                            <span className={styles.modelIdSub}>MFG: {p.manufacturingId || '—'}</span>
+                            <span title={p.modelId}>{p.modelId}</span>
+                            <span className={styles.modelIdSub} title={p.manufacturingId || undefined}>
+                              MFG: {p.manufacturingId || '—'}
+                            </span>
                           </div>
                         </td>
-                        <td>{formatPrice(getMaxPrice(p))}</td>
-                        <td>{formatPrice(p.price)}</td>
-                        <td>{discount > 0 ? `${discount}%` : '—'}</td>
-                        <td>{p.stock}</td>
-                        <td>{minStockAlert > 0 ? minStockAlert : '—'}</td>
-                        <td>{p.inStock ? `In Stock (${p.stock} qty)` : 'Out of Stock'}</td>
+                        <td className={styles.inventoryPriceCell}>{formatPrice(getMaxPrice(p))}</td>
+                        <td className={styles.inventoryPriceCell}>{formatPrice(p.price)}</td>
+                        <td className={styles.inventoryNumericCell}>{discount > 0 ? `${discount}%` : '—'}</td>
+                        <td className={styles.inventoryNumericCell}>{p.stock}</td>
+                        <td className={styles.inventoryNumericCell}>
+                          {minStockAlert > 0 ? minStockAlert : '—'}
+                        </td>
+                        <td className={styles.inventoryStatusCell}>
+                          {p.inStock ? 'In Stock' : 'Out of Stock'}
+                        </td>
+                        <td className={styles.inventoryCertCell}>
+                          <div className={styles.inventoryCertContent}>
+                            {productCertifications.length === 0 ? (
+                              <span className={styles.inventoryCertType}>—</span>
+                            ) : (
+                              productCertifications.map((cert) => {
+                                const certificationLogo = certificationTypes.find(
+                                  (item) => item.type === cert.type
+                                )?.logoUrl
+                                return (
+                                  <div key={cert.type} className={styles.inventoryCertItem}>
+                                    <span className={styles.inventoryCertType} title={cert.type}>
+                                      {cert.type}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className={styles.inventoryCertIconBtn}
+                                      onClick={() => {
+                                        if (!cert.documentUrl) return
+                                        setInventoryCertPreview({
+                                          title: cert.type,
+                                          url: cert.documentUrl,
+                                          productLabel: p.name,
+                                        })
+                                      }}
+                                      disabled={!cert.documentUrl}
+                                      title={
+                                        cert.documentUrl
+                                          ? 'View uploaded certificate'
+                                          : 'No certificate uploaded'
+                                      }
+                                      aria-label={
+                                        cert.documentUrl
+                                          ? `View ${cert.type} certificate for ${p.name}`
+                                          : `No certificate uploaded for ${cert.type}`
+                                      }
+                                    >
+                                      {certificationLogo ? (
+                                        <Image
+                                          src={certificationLogo}
+                                          alt=""
+                                          width={28}
+                                          height={28}
+                                          className={styles.inventoryCertIconImage}
+                                          unoptimized
+                                        />
+                                      ) : (
+                                        <Award className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                )
+                              })
+                            )}
+                          </div>
+                        </td>
                         <td>
                           {canManageInventory ? (
-                            <>
+                            <div className={styles.inventoryActions}>
                               <button
                                 type="button"
-                                className={`${styles.btn} ${styles.btnPrimary} mr-2`}
+                                className={`${styles.btn} ${styles.btnPrimary} ${styles.inventoryActionBtn}`}
                                 onClick={() => openEditProduct(p)}
+                                aria-label={`Edit ${p.name}`}
+                                title="Edit product"
                               >
-                                Edit
+                                <Pencil className="w-4 h-4" />
                               </button>
                               <button
                                 type="button"
-                                className={`${styles.btn} ${styles.btnDanger}`}
+                                className={`${styles.btn} ${styles.btnDanger} ${styles.inventoryActionBtn}`}
                                 onClick={() => deleteProduct(p.id)}
+                                aria-label={`Delete ${p.name}`}
+                                title="Delete product"
                               >
-                                Delete
+                                <Trash2 className="w-4 h-4" />
                               </button>
-                            </>
+                            </div>
                           ) : (
                             <span className="text-muted-foreground text-xs">View only</span>
                           )}
@@ -2042,10 +2213,6 @@ export default function AdminPage() {
               onError={setError}
               onUnreadCountChange={setUnreadCustomerChatCount}
             />
-          )}
-
-          {tab === 'certification' && isFullAdmin && (
-            <CertificationPanel onMessage={showMsg} onError={setError} />
           )}
 
           {tab === 'template' && isFullAdmin && (
@@ -2423,24 +2590,61 @@ export default function AdminPage() {
                 ))}
               </div>
             </div>
-            <div className="mb-3">
-              <label className={styles.warrantyCheckItem}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(editProduct.certificationImage) || showCertModal}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setCertDraftImage(editProduct.certificationImage || null)
-                      setShowCertModal(true)
-                    } else {
-                      setEditProduct({ ...editProduct, certificationImage: undefined })
-                      setShowCertModal(false)
-                      setCertDraftImage(null)
-                    }
-                  }}
+            <div className={`mb-3 ${styles.editCertLogoField}`}>
+              <label className={styles.formLabel}>Logo</label>
+              <button
+                type="button"
+                className={`${styles.editCertLogoBtn} ${
+                  editCertificationLogo ? styles.editCertLogoBtnFilled : ''
+                }`}
+                onClick={() => editCertDocumentInputRef.current?.click()}
+                disabled={imageUploading || !editCertificationType}
+                title={
+                  !editCertificationType
+                    ? 'Select a certification type first'
+                    : editProduct.certificationImage
+                      ? 'Certificate uploaded — click to replace'
+                      : 'Upload certificate document'
+                }
+                aria-label="Upload certificate document"
+              >
+                <span
+                  className={`${styles.editCertStatus} ${
+                    editProduct.certificationImage
+                      ? styles.editCertStatusDone
+                      : styles.editCertStatusPending
+                  }`}
+                  aria-hidden="true"
                 />
-                <span>Certification</span>
-              </label>
+                {editCertificationLogo ? (
+                  <Image
+                    src={editCertificationLogo}
+                    alt=""
+                    width={48}
+                    height={48}
+                    className={styles.editCertLogoPreview}
+                    unoptimized
+                  />
+                ) : (
+                  <ImageIcon className="w-5 h-5" />
+                )}
+              </button>
+              <input
+                ref={editCertDocumentInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                className={styles.hiddenFileInput}
+                onChange={handleEditCertDocumentUpload}
+              />
+            </div>
+            <div className="mb-3">
+              <label className={styles.formLabel}>Certification type</label>
+              <AnimatedFormSelect
+                className={styles.editCertSelect}
+                value={editCertificationType}
+                options={editCertOptions}
+                onChange={handleEditCertTypeChange}
+              />
             </div>
             <div className="flex gap-2">
               <button type="button" className={`${styles.btn} ${styles.btnSuccess}`} onClick={saveProduct}>
@@ -2468,24 +2672,23 @@ export default function AdminPage() {
         />
       )}
 
-      {showCertModal && (
-        <>
-          <ProductCertificationModal
-            draftImage={certDraftImage}
-            uploading={imageUploading}
-            onUploadClick={() => certificationImageInputRef.current?.click()}
-            onSave={saveCertification}
-            onClose={closeCertificationModal}
-          />
-          <input
-            ref={certificationImageInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className={styles.hiddenFileInput}
-            onChange={handleCertificationImageUpload}
-          />
-        </>
+      {inventoryCertPreview && (
+        <CertificationAssetViewModal
+          asset={inventoryCertPreview}
+          onClose={() => setInventoryCertPreview(null)}
+        />
       )}
+
+      <CertificationTypeManagerModal
+        open={showEditCertTypeManager}
+        meta={editProduct?.name ? `Edit product · ${editProduct.name}` : 'Edit product'}
+        onClose={() => setShowEditCertTypeManager(false)}
+        onUseType={(type, logoUrl) => {
+          setEditCertificationType(type)
+          setEditCertificationLogo(logoUrl)
+        }}
+        onTypesUpdated={handleEditCertTypesUpdated}
+      />
 
       {activeNotification && user?.role !== 'admin' && (
         <AdminOrderNotificationPopup

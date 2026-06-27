@@ -14,7 +14,7 @@ const DOCUMENT_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png'])
 
 export async function POST(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const kind = String(formData.get('kind') ?? 'logo')

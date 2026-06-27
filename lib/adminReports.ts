@@ -1,5 +1,4 @@
-import type { Database } from 'better-sqlite3'
-import { getAllProducts } from './db'
+import { getAllProducts, query } from './db'
 import type {
   AdminReportPayload,
   DateRangePreset,
@@ -166,32 +165,28 @@ function displayStatus(status: string, returnedQty: number): string {
   return status
 }
 
-export function buildAdminReport(
-  db: Database,
+export async function buildAdminReport(
   preset: DateRangePreset,
   period: SalesPeriod,
   customStart?: string,
   customEnd?: string,
   orderStatusFilter?: string
-): AdminReportPayload {
+): Promise<AdminReportPayload> {
   const range = resolveDateRange(preset, customStart, customEnd)
   const prev = previousRange(range.start, range.end)
 
-  const allOrders = db
-    .prepare(
-      `SELECT id, user_id, items, total, status, payment_status, payment_method, delivery_method, created_at, returned_qty
-       FROM orders`
-    )
-    .all() as OrderRow[]
+  const allOrders = await query<OrderRow>(
+    `SELECT id, user_id, items, total, status, payment_status, payment_method, delivery_method, created_at, returned_qty
+     FROM orders`
+  )
 
-  const users = db.prepare('SELECT id, name, email FROM users WHERE role = ?').all('customer') as {
-    id: string
-    name: string
-    email: string
-  }[]
+  const users = await query<{ id: string; name: string; email: string }>(
+    'SELECT id, name, email FROM users WHERE role = ?',
+    ['customer']
+  )
   const userMap = new Map(users.map((u) => [u.id, u]))
 
-  const products = getAllProducts()
+  const products = await getAllProducts()
   const productMap = new Map(products.map((p) => [p.id, p]))
 
   const inRange = allOrders.filter((o) => orderInRange(o.created_at, range.start, range.end))

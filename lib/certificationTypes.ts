@@ -1,4 +1,4 @@
-import { getDb } from './db'
+import { queryOne, execute } from './db'
 
 export type CertificationTypeRecord = {
   id: string
@@ -9,11 +9,11 @@ export type CertificationTypeRecord = {
 
 const SETTING_KEY = 'certification_types'
 
-export function getCertificationTypes(): CertificationTypeRecord[] {
-  const db = getDb()
-  const row = db.prepare('SELECT data FROM site_settings WHERE key = ?').get(SETTING_KEY) as
-    | { data: string }
-    | undefined
+export async function getCertificationTypes(): Promise<CertificationTypeRecord[]> {
+  const row = await queryOne<{ data: string }>(
+    'SELECT data FROM site_settings WHERE key = ?',
+    [SETTING_KEY]
+  )
 
   if (!row) return []
 
@@ -25,17 +25,20 @@ export function getCertificationTypes(): CertificationTypeRecord[] {
   }
 }
 
-export function saveCertificationTypes(types: CertificationTypeRecord[]): void {
-  const db = getDb()
+export async function saveCertificationTypes(types: CertificationTypeRecord[]): Promise<void> {
   const now = new Date().toISOString()
-  db.prepare(
+  await execute(
     `INSERT INTO site_settings (key, data, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`
-  ).run(SETTING_KEY, JSON.stringify(types), now)
+     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    [SETTING_KEY, JSON.stringify(types), now]
+  )
 }
 
-export function addCertificationType(input: { type: string; logoUrl: string }): CertificationTypeRecord {
-  const types = getCertificationTypes()
+export async function addCertificationType(input: {
+  type: string
+  logoUrl: string
+}): Promise<CertificationTypeRecord> {
+  const types = await getCertificationTypes()
   const typeName = input.type.trim()
   if (types.some((item) => item.type.toLowerCase() === typeName.toLowerCase())) {
     throw new Error('Certification type already exists')
@@ -46,15 +49,15 @@ export function addCertificationType(input: { type: string; logoUrl: string }): 
     logoUrl: input.logoUrl.trim(),
     createdAt: new Date().toISOString(),
   }
-  saveCertificationTypes([entry, ...types])
+  await saveCertificationTypes([entry, ...types])
   return entry
 }
 
-export function updateCertificationType(
+export async function updateCertificationType(
   id: string,
   input: { type: string; logoUrl: string }
-): CertificationTypeRecord | null {
-  const types = getCertificationTypes()
+): Promise<CertificationTypeRecord | null> {
+  const types = await getCertificationTypes()
   const index = types.findIndex((item) => item.id === id)
   if (index === -1) return null
 
@@ -72,14 +75,14 @@ export function updateCertificationType(
     logoUrl: input.logoUrl.trim(),
   }
   types[index] = updated
-  saveCertificationTypes(types)
+  await saveCertificationTypes(types)
   return updated
 }
 
-export function deleteCertificationType(id: string): boolean {
-  const types = getCertificationTypes()
+export async function deleteCertificationType(id: string): Promise<boolean> {
+  const types = await getCertificationTypes()
   const next = types.filter((item) => item.id !== id)
   if (next.length === types.length) return false
-  saveCertificationTypes(next)
+  await saveCertificationTypes(next)
   return true
 }

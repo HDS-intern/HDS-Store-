@@ -15,11 +15,13 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { id: productId } = await context.params
     const token = getTokenFromRequest(request)
-    const user = getUserBySession(token)
+    const user = await getUserBySession(token)
 
-    const reviews = getMergedReviewsForProduct(productId)
-    const userReview = user ? getUserReviewForProduct(user.id, productId) : null
-    const purchase = user ? hasUserPurchasedProduct(user.id, productId) : { purchased: false }
+    const reviews = await getMergedReviewsForProduct(productId)
+    const userReview = user ? await getUserReviewForProduct(user.id, productId) : null
+    const purchase = user
+      ? await hasUserPurchasedProduct(user.id, productId)
+      : { purchased: false }
 
     return NextResponse.json({
       reviews,
@@ -36,7 +38,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id: productId } = await context.params
     const token = getTokenFromRequest(request)
-    const user = getUserBySession(token)
+    const user = await getUserBySession(token)
 
     if (!user || user.role !== 'customer') {
       return NextResponse.json({ error: 'Login required to submit a review' }, { status: 401 })
@@ -52,7 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Title and comment are required' }, { status: 400 })
     }
 
-    const review = submitReview({
+    const review = await submitReview({
       productId,
       userId: user.id,
       orderId,
@@ -61,7 +63,7 @@ export async function POST(request: Request, context: RouteContext) {
       comment,
     })
 
-    const reviews = getMergedReviewsForProduct(productId)
+    const reviews = await getMergedReviewsForProduct(productId)
     return NextResponse.json({ review, reviews })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to submit review'

@@ -10,15 +10,15 @@ import { isMailConfigured } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
-function requireAdmin(request: Request) {
-  return requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+async function requireAdmin(request: Request) {
+  return requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
 }
 
 export async function GET(request: Request) {
   try {
-    requireAdmin(request)
+    await requireAdmin(request)
     return NextResponse.json({
-      syncedEmail: getSyncedTicketEmail(),
+      syncedEmail: await getSyncedTicketEmail(),
       mailConfigured: isMailConfigured(),
     })
   } catch (e) {
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    requireAdmin(request)
+    await requireAdmin(request)
     const body = await request.json()
     const action = body?.action
 
@@ -52,16 +52,16 @@ export async function POST(request: Request) {
       if (!email.trim()) {
         return NextResponse.json({ error: 'Email is required' }, { status: 400 })
       }
-      verifyTicketEmailOtp(email, otp)
+      await verifyTicketEmailOtp(email, otp)
       return NextResponse.json({
         success: true,
-        syncedEmail: getSyncedTicketEmail(),
+        syncedEmail: await getSyncedTicketEmail(),
         message: 'Email verified and synced for ticket notifications.',
       })
     }
 
     if (action === 'unsync') {
-      clearSyncedTicketEmail()
+      await clearSyncedTicketEmail()
       return NextResponse.json({ success: true, syncedEmail: null })
     }
 

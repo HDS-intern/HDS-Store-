@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Token and new password are required' }, { status: 400 })
     }
 
-    const result = resetPasswordWithToken(token.trim(), password)
+    const result = await resetPasswordWithToken(token.trim(), password)
     return NextResponse.json({
       message: 'Password updated successfully. You can now log in.',
       role: result.role,

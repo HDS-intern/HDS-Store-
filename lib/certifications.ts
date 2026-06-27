@@ -1,4 +1,4 @@
-import { getDb } from './db'
+import { queryOne, execute } from './db'
 
 export type SiteCertification = {
   id: string
@@ -12,11 +12,11 @@ export type SiteCertification = {
 
 const SETTING_KEY = 'site_certifications'
 
-export function getCertifications(): SiteCertification[] {
-  const db = getDb()
-  const row = db.prepare('SELECT data FROM site_settings WHERE key = ?').get(SETTING_KEY) as
-    | { data: string }
-    | undefined
+export async function getCertifications(): Promise<SiteCertification[]> {
+  const row = await queryOne<{ data: string }>(
+    'SELECT data FROM site_settings WHERE key = ?',
+    [SETTING_KEY]
+  )
 
   if (!row) return []
 
@@ -33,19 +33,19 @@ export function getCertifications(): SiteCertification[] {
   }
 }
 
-export function saveCertifications(certifications: SiteCertification[]): void {
-  const db = getDb()
+export async function saveCertifications(certifications: SiteCertification[]): Promise<void> {
   const now = new Date().toISOString()
-  db.prepare(
+  await execute(
     `INSERT INTO site_settings (key, data, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`
-  ).run(SETTING_KEY, JSON.stringify(certifications), now)
+     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    [SETTING_KEY, JSON.stringify(certifications), now]
+  )
 }
 
-export function addCertification(
+export async function addCertification(
   input: Omit<SiteCertification, 'id' | 'createdAt'>
-): SiteCertification {
-  const certifications = getCertifications()
+): Promise<SiteCertification> {
+  const certifications = await getCertifications()
   const entry: SiteCertification = {
     id: `cert-${Date.now()}`,
     type: input.type.trim(),
@@ -55,14 +55,14 @@ export function addCertification(
     productName: input.productName.trim(),
     createdAt: new Date().toISOString(),
   }
-  saveCertifications([entry, ...certifications])
+  await saveCertifications([entry, ...certifications])
   return entry
 }
 
-export function deleteCertification(id: string): boolean {
-  const certifications = getCertifications()
+export async function deleteCertification(id: string): Promise<boolean> {
+  const certifications = await getCertifications()
   const next = certifications.filter((c) => c.id !== id)
   if (next.length === certifications.length) return false
-  saveCertifications(next)
+  await saveCertifications(next)
   return true
 }

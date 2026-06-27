@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message must be at least 10 characters' }, { status: 400 })
     }
 
-    const saved = createContactMessage({
+    const saved = await createContactMessage({
       name: String(name),
       email: String(email),
       phone: phone ? String(phone) : undefined,

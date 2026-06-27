@@ -21,6 +21,11 @@ export interface WarrantyInfo {
   extendedPrice?: string
 }
 
+export interface ProductCertification {
+  type: string
+  documentUrl?: string
+}
+
 export interface Product {
   id: string
   name: string
@@ -55,6 +60,7 @@ export interface Product {
     documentation: string
   }
   certificationImage?: string
+  certifications?: ProductCertification[]
 }
 
 export interface CartItem {

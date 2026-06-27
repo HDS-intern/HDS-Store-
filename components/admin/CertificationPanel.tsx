@@ -7,63 +7,8 @@ import { AdminSlideUp } from '@/components/admin/AdminSlideUp'
 import { apiFetch, getStoredToken } from '@/lib/api'
 import type { SiteCertification } from '@/lib/certifications'
 import type { Product } from '@/lib/types'
+import { CertificationAssetViewModal, type CertificationAssetPreview } from '@/components/admin/CertificationAssetViewModal'
 import styles from './CertificationPanel.module.css'
-
-type AssetPreview = {
-  title: string
-  url: string
-  productLabel?: string
-}
-
-function CertificationAssetViewModal({
-  asset,
-  onClose,
-}: {
-  asset: AssetPreview
-  onClose: () => void
-}) {
-  const isPdf = asset.url.toLowerCase().endsWith('.pdf')
-
-  return (
-    <div
-      className={`${styles.assetModalBackdrop} ${styles.modalBackdropEnter}`}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cert-asset-view-title"
-      onClick={onClose}
-    >
-      <div className={`${styles.assetModal} ${styles.modalEnter}`} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.assetModalHeader}>
-          <div>
-            <h3 id="cert-asset-view-title" className={styles.assetModalTitle}>
-              {asset.title}
-            </h3>
-            {asset.productLabel && <p className={styles.assetModalMeta}>{asset.productLabel}</p>}
-          </div>
-          <button type="button" className={styles.modalClose} onClick={onClose} aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className={styles.assetModalBody}>
-          {isPdf ? (
-            <iframe src={asset.url} title={asset.title} className={styles.pdfFrame} />
-          ) : (
-            <div className={styles.assetImageWrap}>
-              <Image
-                src={asset.url}
-                alt={asset.title}
-                width={640}
-                height={480}
-                className={styles.assetImage}
-                unoptimized
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 type CertificationCreateModalProps = {
   onClose: () => void
@@ -388,7 +333,7 @@ export function CertificationPanel({ onMessage, onError }: CertificationPanelPro
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [assetPreview, setAssetPreview] = useState<AssetPreview | null>(null)
+  const [assetPreview, setAssetPreview] = useState<CertificationAssetPreview | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)

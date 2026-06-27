@@ -1,4 +1,4 @@
-import { getAllProducts, getDb } from './db'
+import { getAllProducts, query } from './db'
 
 export const BAD_REVIEW_MAX_RATING = 2
 export const GOOD_REVIEW_MIN_RATING = 4
@@ -80,31 +80,28 @@ type RawReview = {
   orderId?: string
 }
 
-function collectAllReviews(): RawReview[] {
-  const db = getDb()
-  const dbRows = db
-    .prepare(
-      `SELECT r.id, r.product_id, r.user_id, r.order_id, r.rating, r.title, r.comment, r.created_at,
-              u.name as customer_name, u.email as customer_email,
-              json_extract(p.data, '$.name') as product_name
-       FROM reviews r
-       JOIN users u ON u.id = r.user_id
-       JOIN products p ON p.id = r.product_id
-       ORDER BY r.created_at DESC`
-    )
-    .all() as {
-      id: string
-      product_id: string
-      user_id: string
-      order_id: string | null
-      rating: number
-      title: string
-      comment: string
-      created_at: string
-      customer_name: string
-      customer_email: string
-      product_name: string
-    }[]
+async function collectAllReviews(): Promise<RawReview[]> {
+  const dbRows = await query<{
+    id: string
+    product_id: string
+    user_id: string
+    order_id: string | null
+    rating: number
+    title: string
+    comment: string
+    created_at: string
+    customer_name: string
+    customer_email: string
+    product_name: string
+  }>(
+    `SELECT r.id, r.product_id, r.user_id, r.order_id, r.rating, r.title, r.comment, r.created_at,
+            u.name as customer_name, u.email as customer_email,
+            (p.data::json->>'name') as product_name
+     FROM reviews r
+     JOIN users u ON u.id = r.user_id
+     JOIN products p ON p.id = r.product_id
+     ORDER BY r.created_at DESC`
+  )
 
   const fromDb: RawReview[] = dbRows.map((row) => ({
     id: row.id,
@@ -123,7 +120,7 @@ function collectAllReviews(): RawReview[] {
   const dbIds = new Set(fromDb.map((review) => review.id))
   const legacy: RawReview[] = []
 
-  for (const product of getAllProducts()) {
+  for (const product of await getAllProducts()) {
     for (const review of product.reviewList ?? []) {
       if (dbIds.has(review.id)) continue
       legacy.push({
@@ -153,10 +150,10 @@ export function isGoodReview(rating: number): boolean {
   return rating >= GOOD_REVIEW_MIN_RATING
 }
 
-export function getBadReviewProducts(): BadReviewProductSummary[] {
+export async function getBadReviewProducts(): Promise<BadReviewProductSummary[]> {
   const byProduct = new Map<string, BadReviewProductSummary>()
 
-  for (const review of collectAllReviews()) {
+  for (const review of await collectAllReviews()) {
     const existing = byProduct.get(review.productId) ?? {
       productId: review.productId,
       productName: review.productName,
@@ -177,8 +174,8 @@ export function getBadReviewProducts(): BadReviewProductSummary[] {
     )
 }
 
-export function getBadReviewChart(productId?: string): BadReviewChartMonth[] {
-  const reviews = collectAllReviews().filter(
+export async function getBadReviewChart(productId?: string): Promise<BadReviewChartMonth[]> {
+  const reviews = (await collectAllReviews()).filter(
     (review) => !productId || review.productId === productId
   )
   const monthKeys = lastNMonthKeys(6)
@@ -206,13 +203,13 @@ export function getBadReviewChart(productId?: string): BadReviewChartMonth[] {
   }))
 }
 
-export function getProductReviewScores(): ProductReviewScore[] {
+export async function getProductReviewScores(): Promise<ProductReviewScore[]> {
   const byProduct = new Map<
     string,
     { productName: string; ratings: number[]; good: number; bad: number }
   >()
 
-  for (const review of collectAllReviews()) {
+  for (const review of await collectAllReviews()) {
     const existing = byProduct.get(review.productId) ?? {
       productName: review.productName,
       ratings: [],
@@ -242,8 +239,8 @@ export function getProductReviewScores(): ProductReviewScore[] {
     .slice(0, 8)
 }
 
-export function getGoodReviewEntries(productId?: string): BadReviewEntry[] {
-  return collectAllReviews()
+export async function getGoodReviewEntries(productId?: string): Promise<BadReviewEntry[]> {
+  return (await collectAllReviews())
     .filter((review) => isGoodReview(review.rating))
     .filter((review) => !productId || review.productId === productId)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -262,8 +259,8 @@ export function getGoodReviewEntries(productId?: string): BadReviewEntry[] {
     }))
 }
 
-export function getBadReviewEntries(productId?: string): BadReviewEntry[] {
-  return collectAllReviews()
+export async function getBadReviewEntries(productId?: string): Promise<BadReviewEntry[]> {
+  return (await collectAllReviews())
     .filter((review) => isBadReview(review.rating))
     .filter((review) => !productId || review.productId === productId)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())

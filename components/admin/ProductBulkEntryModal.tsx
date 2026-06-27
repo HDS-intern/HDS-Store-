@@ -3,9 +3,21 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { X, Plus, Trash2, ImageIcon } from 'lucide-react'
-import { AnimatedFormSelect, type AnimatedFormSelectOption } from '@/components/admin/AnimatedFormSelect'
-import { apiFetch, getStoredToken } from '@/lib/api'
+import { AnimatedFormSelect } from '@/components/admin/AnimatedFormSelect'
+import { CertificationTypeManagerModal } from '@/components/admin/CertificationTypeManagerModal'
+import { apiFetch } from '@/lib/api'
 import type { CertificationTypeRecord } from '@/lib/certificationTypes'
+import {
+  buildCertificationTypeOptions,
+  CREATE_CERT_VALUE,
+} from '@/lib/certificationTypeOptions'
+import {
+  createEmptyCertDraftEntry,
+  createInitialCertDraftEntries,
+  ensureTrailingCertDraftSlot,
+  syncCertDraftLogos,
+  type ProductCertDraftEntry,
+} from '@/lib/productCertifications'
 import { syncPricingFields, type PricingField } from '@/lib/productPricing'
 import { applySequentialAutoIds } from '@/lib/productIdGenerator'
 import styles from './ProductBulkEntryModal.module.css'
@@ -22,12 +34,8 @@ export type ProductDraftRow = {
   finalPrice: string
   name: string
   specification: string
-  certificationType: string
-  certificationLogo: string
-  certificationDocument: string
+  certifications: ProductCertDraftEntry[]
 }
-
-const CREATE_CERT_VALUE = '__create_cert_type__'
 
 export function createEmptyProductDraftRow(): ProductDraftRow {
   return {
@@ -42,9 +50,7 @@ export function createEmptyProductDraftRow(): ProductDraftRow {
     finalPrice: '0',
     name: '',
     specification: '',
-    certificationType: '',
-    certificationLogo: '',
-    certificationDocument: '',
+    certifications: createInitialCertDraftEntries(),
   }
 }
 
@@ -53,38 +59,9 @@ type ProductBulkEntryModalProps = {
   saving: boolean
   certDocumentUploading: boolean
   onRowsChange: (rows: ProductDraftRow[]) => void
-  onCertDocumentUpload: (rowId: string, file: File) => Promise<void>
+  onCertDocumentUpload: (rowId: string, certEntryId: string, file: File) => Promise<void>
   onSave: () => void
   onClose: () => void
-}
-
-function buildCertOptions(types: CertificationTypeRecord[]): AnimatedFormSelectOption[] {
-  const unique = types.filter(Boolean)
-  return [
-    { value: '', label: 'Select type', tone: 'default' },
-    ...unique.map((item) => ({
-      value: item.type,
-      label: item.type,
-      tone: 'default' as const,
-    })),
-    { value: CREATE_CERT_VALUE, label: 'Create certification type', tone: 'default' },
-  ]
-}
-
-async function uploadCertificationLogo(file: File): Promise<string> {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('kind', 'logo')
-  const token = getStoredToken()
-  const res = await fetch('/api/admin/certifications/upload', {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  })
-  const data = (await res.json()) as { url?: string; error?: string }
-  if (!res.ok) throw new Error(data.error || 'Upload failed')
-  if (!data.url) throw new Error('Upload failed')
-  return data.url
 }
 
 export function ProductBulkEntryModal({
@@ -97,44 +74,51 @@ export function ProductBulkEntryModal({
   onClose,
 }: ProductBulkEntryModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const certTypeLogoInputRef = useRef<HTMLInputElement>(null)
-  const uploadRowIdRef = useRef<string | null>(null)
+  const uploadTargetRef = useRef<{ rowId: string; certEntryId: string } | null>(null)
   const [autoIdEnabled, setAutoIdEnabled] = useState(false)
   const [noteRowId, setNoteRowId] = useState<string | null>(null)
-  const [createCertRowId, setCreateCertRowId] = useState<string | null>(null)
+  const [createCertTarget, setCreateCertTarget] = useState<{
+    rowId: string
+    certEntryId: string
+  } | null>(null)
   const [certTypes, setCertTypes] = useState<CertificationTypeRecord[]>([])
-  const [certTypesLoading, setCertTypesLoading] = useState(false)
-  const [editingCertTypeId, setEditingCertTypeId] = useState<string | null>(null)
-  const [newCertTypeName, setNewCertTypeName] = useState('')
-  const [newCertLogoUrl, setNewCertLogoUrl] = useState('')
-  const [certTypeUploading, setCertTypeUploading] = useState(false)
-  const [certTypeSaving, setCertTypeSaving] = useState(false)
-  const [certTypeError, setCertTypeError] = useState('')
-  const [certOptions, setCertOptions] = useState<AnimatedFormSelectOption[]>(() =>
-    buildCertOptions([])
-  )
+  const [certOptions, setCertOptions] = useState(() => buildCertificationTypeOptions([]))
 
   const noteRow = noteRowId ? rows.find((row) => row.id === noteRowId) : null
-  const createCertRow = createCertRowId ? rows.find((row) => row.id === createCertRowId) : null
+  const createCertRow = createCertTarget
+    ? rows.find((row) => row.id === createCertTarget.rowId)
+    : null
+
+  const getCertOptionsForEntry = (row: ProductDraftRow, certEntryId: string) => {
+    const current = row.certifications.find((entry) => entry.id === certEntryId)?.type ?? ''
+    const used = new Set(
+      row.certifications
+        .filter((entry) => entry.id !== certEntryId && entry.type)
+        .map((entry) => entry.type)
+    )
+
+    return certOptions.filter(
+      (option) =>
+        option.value === CREATE_CERT_VALUE ||
+        option.value === '' ||
+        option.value === current ||
+        !used.has(option.value)
+    )
+  }
 
   const syncCertOptions = (types: CertificationTypeRecord[]) => {
     setCertTypes(types)
-    setCertOptions(buildCertOptions(types))
+    setCertOptions(buildCertificationTypeOptions(types))
   }
 
   const loadCertificationTypes = async () => {
-    setCertTypesLoading(true)
-    setCertTypeError('')
     try {
       const data = await apiFetch<{ certificationTypes: CertificationTypeRecord[] }>(
         '/api/admin/certification-types'
       )
       syncCertOptions(Array.isArray(data.certificationTypes) ? data.certificationTypes : [])
-    } catch (e) {
-      setCertTypeError(e instanceof Error ? e.message : 'Failed to load certification types')
+    } catch {
       syncCertOptions([])
-    } finally {
-      setCertTypesLoading(false)
     }
   }
 
@@ -174,123 +158,86 @@ export function ProductBulkEntryModal({
     }
   }
 
-  const resetCertTypeForm = () => {
-    setEditingCertTypeId(null)
-    setNewCertTypeName('')
-    setNewCertLogoUrl('')
-    setCertTypeError('')
+  const updateRowCertifications = (rowId: string, certifications: ProductCertDraftEntry[]) => {
+    updateRow(rowId, { certifications: ensureTrailingCertDraftSlot(certifications) })
   }
 
-  const openCertTypeManager = (rowId: string) => {
-    setCreateCertRowId(rowId)
-    resetCertTypeForm()
-    void loadCertificationTypes()
+  const openCertTypeManager = (rowId: string, certEntryId: string) => {
+    setCreateCertTarget({ rowId, certEntryId })
   }
 
   const closeCertTypeManager = () => {
-    setCreateCertRowId(null)
-    resetCertTypeForm()
+    setCreateCertTarget(null)
   }
 
-  const handleCertTypeChange = (rowId: string, value: string) => {
+  const handleCertTypeChange = (rowId: string, certEntryId: string, value: string) => {
     if (value === CREATE_CERT_VALUE) {
-      openCertTypeManager(rowId)
+      openCertTypeManager(rowId, certEntryId)
       return
     }
+
+    const row = rows.find((item) => item.id === rowId)
+    if (!row) return
+
     const match = certTypes.find((item) => item.type === value)
-    updateRow(rowId, {
-      certificationType: value,
-      certificationLogo: match?.logoUrl ?? '',
-    })
+    const nextCertifications = row.certifications.map((entry) =>
+      entry.id === certEntryId
+        ? {
+            ...entry,
+            type: value,
+            logoUrl: match?.logoUrl ?? '',
+            documentUrl: value ? entry.documentUrl : '',
+          }
+        : entry
+    )
+
+    updateRowCertifications(rowId, nextCertifications)
+  }
+
+  const handleCertTypesUpdated = (types: CertificationTypeRecord[]) => {
+    syncCertOptions(types)
+    onRowsChange(
+      rows.map((row) => ({
+        ...row,
+        certifications: ensureTrailingCertDraftSlot(syncCertDraftLogos(row.certifications, types)),
+      }))
+    )
   }
 
   const applyCertTypeToRow = (type: string, logoUrl: string) => {
-    if (!createCertRowId) return
-    updateRow(createCertRowId, { certificationType: type, certificationLogo: logoUrl })
+    if (!createCertTarget) return
+    const row = rows.find((item) => item.id === createCertTarget.rowId)
+    if (!row) return
+
+    const nextCertifications = row.certifications.map((entry) =>
+      entry.id === createCertTarget.certEntryId
+        ? { ...entry, type, logoUrl, documentUrl: entry.documentUrl }
+        : entry
+    )
+
+    updateRowCertifications(createCertTarget.rowId, nextCertifications)
   }
 
-  const handleCertTypeLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setCertTypeUploading(true)
-    setCertTypeError('')
-    try {
-      const url = await uploadCertificationLogo(file)
-      setNewCertLogoUrl(url)
-    } catch (err) {
-      setCertTypeError(err instanceof Error ? err.message : 'Logo upload failed')
-    } finally {
-      e.target.value = ''
-      setCertTypeUploading(false)
-    }
-  }
+  const handleRemoveCertification = (
+    rowId: string,
+    certEntryId: string,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    event.preventDefault()
+    event.stopPropagation()
 
-  const saveCertType = async () => {
-    const name = newCertTypeName.trim()
-    if (!name) {
-      setCertTypeError('Certification type name is required')
-      return
-    }
-    if (!newCertLogoUrl) {
-      setCertTypeError('Certification logo is required')
-      return
-    }
+    const row = rows.find((item) => item.id === rowId)
+    if (!row || row.certifications.length < 2) return
 
-    setCertTypeSaving(true)
-    setCertTypeError('')
-    try {
-      if (editingCertTypeId) {
-        await apiFetch('/api/admin/certification-types', {
-          method: 'PUT',
-          body: JSON.stringify({ id: editingCertTypeId, type: name, logoUrl: newCertLogoUrl }),
-        })
-      } else {
-        await apiFetch('/api/admin/certification-types', {
-          method: 'POST',
-          body: JSON.stringify({ type: name, logoUrl: newCertLogoUrl }),
-        })
-      }
-      await loadCertificationTypes()
-      applyCertTypeToRow(name, newCertLogoUrl)
-      resetCertTypeForm()
-    } catch (err) {
-      setCertTypeError(err instanceof Error ? err.message : 'Failed to save certification type')
-    } finally {
-      setCertTypeSaving(false)
+    const nextCertifications = row.certifications.filter((entry) => entry.id !== certEntryId)
+    updateRow(rowId, {
+      certifications:
+        nextCertifications.length > 0 ? nextCertifications : [createEmptyCertDraftEntry()],
+    })
+
+    if (createCertTarget?.rowId === rowId && createCertTarget.certEntryId === certEntryId) {
+      setCreateCertTarget(null)
     }
-  }
-
-  const startEditCertType = (item: CertificationTypeRecord) => {
-    setEditingCertTypeId(item.id)
-    setNewCertTypeName(item.type)
-    setNewCertLogoUrl(item.logoUrl)
-    setCertTypeError('')
-  }
-
-  const deleteCertType = async (item: CertificationTypeRecord) => {
-    if (!window.confirm(`Delete certification type "${item.type}"?`)) return
-    setCertTypeError('')
-    try {
-      await apiFetch(`/api/admin/certification-types?id=${encodeURIComponent(item.id)}`, {
-        method: 'DELETE',
-      })
-      if (editingCertTypeId === item.id) resetCertTypeForm()
-      await loadCertificationTypes()
-      onRowsChange(
-        rows.map((row) =>
-          row.certificationType === item.type
-            ? { ...row, certificationType: '', certificationLogo: '' }
-            : row
-        )
-      )
-    } catch (err) {
-      setCertTypeError(err instanceof Error ? err.message : 'Failed to delete certification type')
-    }
-  }
-
-  const useCertTypeForRow = (item: CertificationTypeRecord) => {
-    applyCertTypeToRow(item.type, item.logoUrl)
-    closeCertTypeManager()
   }
 
   const addRow = () => {
@@ -304,18 +251,18 @@ export function ProductBulkEntryModal({
     onRowsChange(autoIdEnabled ? applySequentialAutoIds(next) : next)
   }
 
-  const triggerCertDocumentUpload = (rowId: string) => {
-    uploadRowIdRef.current = rowId
+  const triggerCertDocumentUpload = (rowId: string, certEntryId: string) => {
+    uploadTargetRef.current = { rowId, certEntryId }
     fileInputRef.current?.click()
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    const rowId = uploadRowIdRef.current
-    if (!file || !rowId) return
-    await onCertDocumentUpload(rowId, file)
+    const target = uploadTargetRef.current
+    if (!file || !target) return
+    await onCertDocumentUpload(target.rowId, target.certEntryId, file)
     e.target.value = ''
-    uploadRowIdRef.current = null
+    uploadTargetRef.current = null
   }
 
   return (
@@ -387,7 +334,7 @@ export function ProductBulkEntryModal({
                   <th className={styles.subHead}>1. Product name *</th>
                   <th className={styles.subHead}>2. Note *</th>
                   <th className={styles.subHead}>1. Certification type</th>
-                  <th className={styles.subHead}>2. Certification logo</th>
+                  <th className={styles.subHead}>2. Logo</th>
                 </tr>
               </thead>
               <tbody>
@@ -479,55 +426,83 @@ export function ProductBulkEntryModal({
                         Note
                       </button>
                     </td>
-                    <td>
-                      <AnimatedFormSelect
-                        className={styles.certSelectWrap}
-                        variant="cell"
-                        value={
-                          row.certificationType === CREATE_CERT_VALUE ? '' : row.certificationType
-                        }
-                        options={certOptions}
-                        onChange={(value) => handleCertTypeChange(row.id, value)}
-                      />
+                    <td className={styles.certTypeCell}>
+                      <div className={styles.certStack}>
+                        {row.certifications.map((cert) => (
+                          <div key={cert.id} className={styles.certEntry}>
+                            <div className={styles.certSelectShell}>
+                              {row.certifications.length >= 2 && (
+                                <button
+                                  type="button"
+                                  className={styles.certRemoveBtn}
+                                  onClick={(event) =>
+                                    handleRemoveCertification(row.id, cert.id, event)
+                                  }
+                                  onMouseDown={(event) => event.stopPropagation()}
+                                  aria-label="Remove certification"
+                                  title="Remove certification"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                              <AnimatedFormSelect
+                                className={styles.certSelectWrap}
+                                variant="cell"
+                                value={cert.type === CREATE_CERT_VALUE ? '' : cert.type}
+                                options={getCertOptionsForEntry(row, cert.id)}
+                                onChange={(value) => handleCertTypeChange(row.id, cert.id, value)}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className={styles.logoCellTd}>
-                      <button
-                        type="button"
-                        className={`${styles.logoBtn} ${row.certificationLogo ? styles.logoBtnFilled : ''}`}
-                        onClick={() => triggerCertDocumentUpload(row.id)}
-                        disabled={certDocumentUploading}
-                        aria-label={
-                          row.certificationDocument
-                            ? 'Certificate uploaded — click to replace'
-                            : 'Upload certificate document'
-                        }
-                        title={
-                          row.certificationDocument
-                            ? 'Certificate uploaded — click to replace'
-                            : 'Upload certificate document'
-                        }
-                      >
-                        <span
-                          className={`${styles.certUploadStatus} ${
-                            row.certificationDocument
-                              ? styles.certUploadStatusDone
-                              : styles.certUploadStatusPending
-                          }`}
-                          aria-hidden="true"
-                        />
-                        {row.certificationLogo ? (
-                          <Image
-                            src={row.certificationLogo}
-                            alt=""
-                            width={48}
-                            height={48}
-                            className={styles.logoBtnPreview}
-                            unoptimized
-                          />
-                        ) : (
-                          <ImageIcon className="w-5 h-5" />
-                        )}
-                      </button>
+                      <div className={styles.certStack}>
+                        {row.certifications.map((cert) => (
+                          <div key={cert.id} className={styles.certEntry}>
+                            <button
+                              type="button"
+                              className={`${styles.logoBtn} ${cert.logoUrl ? styles.logoBtnFilled : ''}`}
+                              onClick={() => triggerCertDocumentUpload(row.id, cert.id)}
+                              disabled={certDocumentUploading || !cert.type}
+                              aria-label={
+                                cert.documentUrl
+                                  ? 'Certificate uploaded — click to replace'
+                                  : 'Upload certificate document'
+                              }
+                              title={
+                                !cert.type
+                                  ? 'Select a certification type first'
+                                  : cert.documentUrl
+                                    ? 'Certificate uploaded — click to replace'
+                                    : 'Upload certificate document'
+                              }
+                            >
+                              <span
+                                className={`${styles.certUploadStatus} ${
+                                  cert.documentUrl
+                                    ? styles.certUploadStatusDone
+                                    : styles.certUploadStatusPending
+                                }`}
+                                aria-hidden="true"
+                              />
+                              {cert.logoUrl ? (
+                                <Image
+                                  src={cert.logoUrl}
+                                  alt=""
+                                  width={48}
+                                  height={48}
+                                  className={styles.logoBtnPreview}
+                                  unoptimized
+                                />
+                              ) : (
+                                <ImageIcon className="w-5 h-5" />
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td>
                       <button
@@ -553,13 +528,6 @@ export function ProductBulkEntryModal({
             className={styles.hiddenInput}
             onChange={handleFileChange}
           />
-          <input
-            ref={certTypeLogoInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-            className={styles.hiddenInput}
-            onChange={handleCertTypeLogoUpload}
-          />
 
           <div className={styles.footer}>
             <button type="button" className={styles.addRowBtn} onClick={addRow}>
@@ -578,184 +546,19 @@ export function ProductBulkEntryModal({
         </div>
       </div>
 
-      {createCertRow && (
-        <div
-          className={styles.noteBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-cert-type-title"
-          onClick={closeCertTypeManager}
-        >
-          <div className={styles.createCertModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.noteHeader}>
-              <div>
-                <h3 id="create-cert-type-title" className={styles.noteTitle}>
-                  Manage certification types
-                </h3>
-                <p className={styles.noteMeta}>
-                  Row {rows.findIndex((row) => row.id === createCertRow.id) + 1}
-                  {createCertRow.name.trim() ? ` · ${createCertRow.name}` : ''}
-                </p>
-              </div>
-              <button
-                type="button"
-                className={styles.noteCloseBtn}
-                onClick={closeCertTypeManager}
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className={styles.createCertBody}>
-              {certTypeError && <p className={styles.certTypeError}>{certTypeError}</p>}
-
-              <div className={styles.createCertFormTableWrap}>
-                <table className={styles.createCertFormTable}>
-                  <thead>
-                    <tr>
-                      <th>Certification type</th>
-                      <th>Logo upload</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <input
-                          className={styles.createCertInputInline}
-                          value={newCertTypeName}
-                          onChange={(e) => setNewCertTypeName(e.target.value)}
-                          placeholder="Enter certification type name"
-                          autoFocus
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className={`${styles.createCertLogoBtn} ${newCertLogoUrl ? styles.createCertLogoBtnFilled : ''}`}
-                          onClick={() => certTypeLogoInputRef.current?.click()}
-                          disabled={certTypeUploading}
-                        >
-                          {newCertLogoUrl ? (
-                            <>
-                              <Image
-                                src={newCertLogoUrl}
-                                alt=""
-                                width={36}
-                                height={36}
-                                className={styles.createCertLogoPreview}
-                                unoptimized
-                              />
-                              <span>{certTypeUploading ? 'Uploading...' : 'Change logo'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <ImageIcon className="w-5 h-5" />
-                              <span>{certTypeUploading ? 'Uploading...' : 'Upload logo'}</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className={styles.createCertFormActions}>
-                {editingCertTypeId && (
-                  <button type="button" className={styles.certTypeCancelEditBtn} onClick={resetCertTypeForm}>
-                    Cancel edit
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={styles.noteDoneBtn}
-                  onClick={() => void saveCertType()}
-                  disabled={certTypeSaving || certTypeUploading || !newCertTypeName.trim() || !newCertLogoUrl}
-                >
-                  {certTypeSaving
-                    ? 'Saving...'
-                    : editingCertTypeId
-                      ? 'Update type'
-                      : 'Add type'}
-                </button>
-              </div>
-
-              <h4 className={styles.createCertListTitle}>Existing certification types</h4>
-              <div className={styles.createCertListWrap}>
-                {certTypesLoading ? (
-                  <p className={styles.createCertEmpty}>Loading certification types...</p>
-                ) : (
-                  <table className={styles.createCertListTable}>
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Logo</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {certTypes.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.type}</td>
-                          <td>
-                            <Image
-                              src={item.logoUrl}
-                              alt={`${item.type} logo`}
-                              width={40}
-                              height={40}
-                              className={styles.createCertListLogo}
-                              unoptimized
-                            />
-                          </td>
-                          <td>
-                            <div className={styles.createCertActions}>
-                              <button
-                                type="button"
-                                className={styles.certTypeUseBtn}
-                                onClick={() => useCertTypeForRow(item)}
-                              >
-                                Use
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.certTypeEditBtn}
-                                onClick={() => startEditCertType(item)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.certTypeDeleteBtn}
-                                onClick={() => void deleteCertType(item)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {certTypes.length === 0 && (
-                        <tr>
-                          <td colSpan={3} className={styles.createCertEmpty}>
-                            No certification types yet. Add one above.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.noteActions}>
-              <button type="button" className={styles.noteDoneBtn} onClick={closeCertTypeManager}>
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CertificationTypeManagerModal
+        open={Boolean(createCertRow)}
+        meta={
+          createCertRow && createCertTarget
+            ? `Row ${rows.findIndex((row) => row.id === createCertRow.id) + 1}${
+                createCertRow.name.trim() ? ` · ${createCertRow.name}` : ''
+              }`
+            : undefined
+        }
+        onClose={closeCertTypeManager}
+        onUseType={applyCertTypeToRow}
+        onTypesUpdated={handleCertTypesUpdated}
+      />
 
       {noteRow && (
         <div

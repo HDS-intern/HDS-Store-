@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUserBySession, getTokenFromRequest } from '@/lib/auth'
-import { getDb, dbUserToUser, type DbUser } from '@/lib/db'
+import { queryOne, execute, dbUserToUser, type DbUser } from '@/lib/db'
 import { validateStaffPhotoDataUrl } from '@/lib/staffPhoto'
 import type { SavedAddress } from '@/lib/types'
 
@@ -35,7 +35,7 @@ function normalizeAddresses(raw: unknown): SavedAddress[] {
 
 export async function PATCH(request: Request) {
   try {
-    const sessionUser = getUserBySession(getTokenFromRequest(request))
+    const sessionUser = await getUserBySession(getTokenFromRequest(request))
     if (!sessionUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -62,10 +62,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    const db = getDb()
-    const existingEmail = db
-      .prepare('SELECT id FROM users WHERE email = ? AND id != ?')
-      .get(email, sessionUser.id) as { id: string } | undefined
+    const existingEmail = await queryOne<{ id: string }>(
+      'SELECT id FROM users WHERE email = ? AND id != ?',
+      [email, sessionUser.id]
+    )
 
     if (existingEmail) {
       return NextResponse.json({ error: 'Email is already in use' }, { status: 409 })
@@ -79,28 +79,29 @@ export async function PATCH(request: Request) {
     }
 
     if (profilePhoto !== undefined) {
-      db.prepare(
-        'UPDATE users SET name = ?, email = ?, phone = ?, addresses = ?, profile_photo = ? WHERE id = ?'
-      ).run(
-        name,
-        email,
-        phone || null,
-        addresses.length > 0 ? JSON.stringify(addresses) : null,
-        profilePhoto,
-        sessionUser.id
+      await execute(
+        'UPDATE users SET name = ?, email = ?, phone = ?, addresses = ?, profile_photo = ? WHERE id = ?',
+        [
+          name,
+          email,
+          phone || null,
+          addresses.length > 0 ? JSON.stringify(addresses) : null,
+          profilePhoto,
+          sessionUser.id,
+        ]
       )
     } else {
-      db.prepare('UPDATE users SET name = ?, email = ?, phone = ?, addresses = ? WHERE id = ?').run(
+      await execute('UPDATE users SET name = ?, email = ?, phone = ?, addresses = ? WHERE id = ?', [
         name,
         email,
         phone || null,
         addresses.length > 0 ? JSON.stringify(addresses) : null,
-        sessionUser.id
-      )
+        sessionUser.id,
+      ])
     }
 
-    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(sessionUser.id) as DbUser
-    return NextResponse.json({ user: dbUserToUser(updated) })
+    const updated = await queryOne<DbUser>('SELECT * FROM users WHERE id = ?', [sessionUser.id])
+    return NextResponse.json({ user: dbUserToUser(updated!) })
   } catch {
     return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
   }

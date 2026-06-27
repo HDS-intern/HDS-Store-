@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     return NextResponse.json(getDcTemplatePreviewMeta())
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'

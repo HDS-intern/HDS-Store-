@@ -14,18 +14,18 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
     if (userId) {
-      markSupportMessagesRead(userId, 'staff')
-      const messages = listChatMessages(userId, 'support')
+      await markSupportMessagesRead(userId, 'staff')
+      const messages = await listChatMessages(userId, 'support')
       return NextResponse.json({ messages, userId })
     }
 
-    const threads = listSupportThreads()
-    const unreadCount = countUnreadCustomerChatMessages()
+    const threads = await listSupportThreads()
+    const unreadCount = await countUnreadCustomerChatMessages()
     return NextResponse.json({ threads, unreadCount })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const staff = requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    const staff = requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     const { userId, message } = await request.json()
 
     if (!userId || typeof userId !== 'string') {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    const reply = insertChatMessage({
+    const reply = await insertChatMessage({
       userId,
       channel: 'support',
       sender: 'staff',
@@ -63,17 +63,17 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     const body = await request.json()
     const messageId = typeof body.messageId === 'string' ? body.messageId : ''
     const userId = typeof body.userId === 'string' ? body.userId : ''
 
     if (userId) {
-      const deletedCount = deleteSupportThread(userId)
+      const deletedCount = await deleteSupportThread(userId)
       if (deletedCount === 0) {
         return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
       }
-      const unreadCount = countUnreadCustomerChatMessages()
+      const unreadCount = await countUnreadCustomerChatMessages()
       return NextResponse.json({ success: true, deletedCount, unreadCount })
     }
 
@@ -81,12 +81,12 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Message ID or user ID required' }, { status: 400 })
     }
 
-    const deleted = deleteSupportChatMessage(messageId)
+    const deleted = await deleteSupportChatMessage(messageId)
     if (!deleted) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 })
     }
 
-    const unreadCount = countUnreadCustomerChatMessages()
+    const unreadCount = await countUnreadCustomerChatMessages()
     return NextResponse.json({ success: true, unreadCount })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'

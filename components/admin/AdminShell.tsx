@@ -15,7 +15,6 @@ export type AdminTab =
   | 'payments'
   | 'users'
   | 'staff-data'
-  | 'certification'
   | 'template'
   | 'messages'
   | 'customer-chat'

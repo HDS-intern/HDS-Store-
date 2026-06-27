@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 import { getUserBySession, getTokenFromRequest, requireStaffAccess } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
+import type { User } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
-function canViewOrders(user: NonNullable<ReturnType<typeof getUserBySession>>) {
+function canViewOrders(user: User) {
   return (
     hasPermission(user, 'dashboard') ||
     hasPermission(user, 'orders_view') ||
@@ -35,34 +36,31 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const user = requireStaffAccess(getUserBySession(getTokenFromRequest(_request)))
+    const user = requireStaffAccess(await getUserBySession(getTokenFromRequest(_request)))
     if (!canViewOrders(user)) {
       throw new Error('Unauthorized')
     }
 
     const { userId } = await params
-    const db = getDb()
 
-    const customer = db
-      .prepare(
-        `SELECT id, username, email, name, role, phone, created_at
-         FROM users WHERE id = ?`
-      )
-      .get(userId) as
-      | {
-          id: string
-          username: string
-          email: string
-          name: string
-          role: string
-          phone: string | null
-          created_at: string
-        }
-      | undefined
+    const customer = await queryOne<{
+      id: string
+      username: string
+      email: string
+      name: string
+      role: string
+      phone: string | null
+      created_at: string
+    }>(
+      `SELECT id, username, email, name, role, phone, created_at
+       FROM users WHERE id = ?`,
+      [userId]
+    )
 
-    const orderRows = db
-      .prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC')
-      .all(userId) as Record<string, unknown>[]
+    const orderRows = await query<Record<string, unknown>>(
+      'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC',
+      [userId]
+    )
 
     const orders = orderRows.map(parseOrderRow)
 

@@ -1,25 +1,25 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { getDb, getAllProducts } from '@/lib/db'
+import { queryOne, execute, getAllProducts } from '@/lib/db'
 import { getUserBySession, getTokenFromRequest, requirePermission, requireStaffAccess } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
 import type { Product } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
-function getAdminUser(request: Request) {
+async function getAdminUser(request: Request) {
   const token = getTokenFromRequest(request)
-  const user = getUserBySession(token)
+  const user = await getUserBySession(token)
   return requireStaffAccess(user)
 }
 
 export async function GET(request: Request) {
   try {
-    const user = getAdminUser(request)
+    const user = await getAdminUser(request)
     if (!hasPermission(user, 'inventory_view') && !hasPermission(user, 'inventory_manage')) {
       throw new Error('Unauthorized')
     }
-    return NextResponse.json({ products: getAllProducts() })
+    return NextResponse.json({ products: await getAllProducts() })
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
     const product = (await request.json()) as Product
 
     if (!product.name || product.price == null) {
@@ -77,11 +77,13 @@ export async function POST(request: Request) {
       longDescription: product.longDescription || product.description || '',
     }
 
-    const db = getDb()
     const now = new Date().toISOString()
-    db.prepare(
-      'INSERT INTO products (id, data, stock, updated_at) VALUES (?, ?, ?, ?)'
-    ).run(id, JSON.stringify(fullProduct), stock, now)
+    await execute('INSERT INTO products (id, data, stock, updated_at) VALUES (?, ?, ?, ?)', [
+      id,
+      JSON.stringify(fullProduct),
+      stock,
+      now,
+    ])
 
     return NextResponse.json({ product: { ...fullProduct, stock, inStock: stock > 0 } })
   } catch (e) {
@@ -93,17 +95,17 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
     const { id, ...updates } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'Product ID required' }, { status: 400 })
     }
 
-    const db = getDb()
-    const row = db.prepare('SELECT data, stock FROM products WHERE id = ?').get(id) as
-      | { data: string; stock: number }
-      | undefined
+    const row = await queryOne<{ data: string; stock: number }>(
+      'SELECT data, stock FROM products WHERE id = ?',
+      [id]
+    )
 
     if (!row) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -129,12 +131,12 @@ export async function PUT(request: Request) {
       manufacturingId,
     }
 
-    db.prepare('UPDATE products SET data = ?, stock = ?, updated_at = ? WHERE id = ?').run(
+    await execute('UPDATE products SET data = ?, stock = ?, updated_at = ? WHERE id = ?', [
       JSON.stringify(updated),
       stock,
       new Date().toISOString(),
-      id
-    )
+      id,
+    ])
 
     return NextResponse.json({ product: updated })
   } catch (e) {
@@ -146,12 +148,11 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'Product ID required' }, { status: 400 })
 
-    const db = getDb()
-    db.prepare('DELETE FROM products WHERE id = ?').run(id)
+    await execute('DELETE FROM products WHERE id = ?', [id])
     return NextResponse.json({ success: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'

@@ -16,6 +16,12 @@
   transition: color 0.3s ease;
 }
 
+.labelWrap {
+  max-width: 4.75rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .labelHighlighted {
   color: #86efac;
   animation: columnHighlight 2.4s ease;

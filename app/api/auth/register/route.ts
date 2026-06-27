@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { getDb, dbUserToUser } from '@/lib/db'
+import { queryOne, execute, dbUserToUser, type DbUser } from '@/lib/db'
 import { hashPassword, createSession } from '@/lib/auth'
 
 export const runtime = 'nodejs'
@@ -23,10 +23,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const db = getDb()
-    const existing = db
-      .prepare('SELECT id FROM users WHERE username = ? OR email = ?')
-      .get(username.trim(), email.trim())
+    const existing = await queryOne<{ id: string }>(
+      'SELECT id FROM users WHERE username = ? OR email = ?',
+      [username.trim(), email.trim()]
+    )
 
     if (existing) {
       return NextResponse.json({ error: 'Username or email already exists' }, { status: 409 })
@@ -36,15 +36,16 @@ export async function POST(request: Request) {
     const hash = hashPassword(password)
     const now = new Date().toISOString()
 
-    db.prepare(
+    await execute(
       `INSERT INTO users (id, username, email, password_hash, name, role, phone, created_at)
-       VALUES (?, ?, ?, ?, ?, 'customer', ?, ?)`
-    ).run(id, username.trim(), email.trim(), hash, name.trim(), phone?.trim() || null, now)
+       VALUES (?, ?, ?, ?, ?, 'customer', ?, ?)`,
+      [id, username.trim(), email.trim(), hash, name.trim(), phone?.trim() || null, now]
+    )
 
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
-    const token = createSession(id)
+    const user = await queryOne<DbUser>('SELECT * FROM users WHERE id = ?', [id])
+    const token = await createSession(id)
 
-    return NextResponse.json({ token, user: dbUserToUser(user as Parameters<typeof dbUserToUser>[0]) })
+    return NextResponse.json({ token, user: dbUserToUser(user!) })
   } catch {
     return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
   }

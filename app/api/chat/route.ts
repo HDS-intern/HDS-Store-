@@ -12,8 +12,8 @@ import type { ChatChannel } from '@/lib/chatTypes'
 
 export const runtime = 'nodejs'
 
-function resolveChatUserId(request: Request): string {
-  const sessionUser = getUserBySession(getTokenFromRequest(request))
+async function resolveChatUserId(request: Request): Promise<string> {
+  const sessionUser = await getUserBySession(getTokenFromRequest(request))
   if (sessionUser?.role === 'customer') {
     return sessionUser.id
   }
@@ -28,7 +28,7 @@ function resolveChatUserId(request: Request): string {
 
 export async function GET(request: Request) {
   try {
-    const userId = resolveChatUserId(request)
+    const userId = await resolveChatUserId(request)
     const { searchParams } = new URL(request.url)
     const channel = (searchParams.get('channel') || 'bot') as ChatChannel
 
@@ -37,13 +37,13 @@ export async function GET(request: Request) {
     }
 
     if (searchParams.get('countOnly') === '1' && channel === 'support') {
-      return NextResponse.json({ unreadSupport: countUnreadSupportForCustomer(userId) })
+      return NextResponse.json({ unreadSupport: await countUnreadSupportForCustomer(userId) })
     }
 
-    let messages = listChatMessages(userId, channel)
+    let messages = await listChatMessages(userId, channel)
 
     if (channel === 'bot' && messages.length === 0) {
-      const greeting = insertChatMessage({
+      const greeting = await insertChatMessage({
         userId,
         channel: 'bot',
         sender: 'bot',
@@ -53,10 +53,10 @@ export async function GET(request: Request) {
     }
 
     if (channel === 'support') {
-      markSupportMessagesRead(userId, 'customer')
+      await markSupportMessagesRead(userId, 'customer')
     }
 
-    const unreadSupport = countUnreadSupportForCustomer(userId)
+    const unreadSupport = await countUnreadSupportForCustomer(userId)
 
     return NextResponse.json({ messages, unreadSupport })
   } catch (e) {
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const userId = resolveChatUserId(request)
+    const userId = await resolveChatUserId(request)
     const { channel, message } = await request.json()
     const chatChannel = channel as ChatChannel
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    const customerMessage = insertChatMessage({
+    const customerMessage = await insertChatMessage({
       userId,
       channel: chatChannel,
       sender: 'customer',
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     })
 
     if (chatChannel === 'bot') {
-      const reply = insertChatMessage({
+      const reply = await insertChatMessage({
         userId,
         channel: 'bot',
         sender: 'bot',

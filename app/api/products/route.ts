@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 
 export async function GET() {
   try {
-    const products = getAllProducts()
+    const products = await getAllProducts()
     return NextResponse.json(
       { products },
       {

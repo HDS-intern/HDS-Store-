@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Username or email is required' }, { status: 400 })
     }
 
-    const result = createPasswordResetToken(login)
+    const result = await createPasswordResetToken(login)
     if (!result) {
       return NextResponse.json(
         { error: 'No account found with that username or email' },

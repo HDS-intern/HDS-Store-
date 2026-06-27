@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { getUserBySession, getTokenFromRequest, requireStaffAccess } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
 import { getInvoiceById } from '@/lib/invoices'
+import type { User } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-function canViewInvoices(user: NonNullable<ReturnType<typeof getUserBySession>>) {
+function canViewInvoices(user: User) {
   return (
     hasPermission(user, 'orders_view') ||
     hasPermission(user, 'orders_manage') ||
@@ -18,13 +19,13 @@ function canViewInvoices(user: NonNullable<ReturnType<typeof getUserBySession>>)
 
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const user = requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    const user = requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     if (!canViewInvoices(user)) {
       throw new Error('Unauthorized')
     }
 
     const { id } = await context.params
-    const invoice = getInvoiceById(id)
+    const invoice = await getInvoiceById(id)
     if (!invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }

@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   const token = getTokenFromRequest(request)
-  const user = getUserBySession(token)
+  const user = await getUserBySession(token)
   if (!user) {
     return NextResponse.json({ user: null }, { status: 401 })
   }

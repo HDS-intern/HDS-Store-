@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUserBySession, getTokenFromRequest } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { queryOne } from '@/lib/db'
 import { createWarrantyClaim } from '@/lib/warrantyClaims'
 import { validateUploadFile } from '@/lib/uploadValidation'
 
@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   try {
-    const user = getUserBySession(getTokenFromRequest(request))
+    const user = await getUserBySession(getTokenFromRequest(request))
     if (!user || user.role !== 'customer') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -47,10 +47,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: fileError }, { status: 400 })
     }
 
-    const db = getDb()
-    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(orderId, user.id) as
-      | Record<string, unknown>
-      | undefined
+    const order = await queryOne<Record<string, unknown>>(
+      'SELECT * FROM orders WHERE id = ? AND user_id = ?',
+      [orderId, user.id]
+    )
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -70,15 +70,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Product not found in this order' }, { status: 400 })
     }
 
-    const productRow = db.prepare('SELECT data FROM products WHERE id = ?').get(productId) as
-      | { data: string }
-      | undefined
+    const productRow = await queryOne<{ data: string }>('SELECT data FROM products WHERE id = ?', [
+      productId,
+    ])
     const productName = productRow
       ? ((JSON.parse(productRow.data) as { name?: string }).name ?? productId)
       : productId
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const claim = createWarrantyClaim({
+    const claim = await createWarrantyClaim({
       userId: user.id,
       orderId,
       productId,

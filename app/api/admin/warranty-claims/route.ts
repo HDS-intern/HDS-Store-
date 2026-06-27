@@ -6,8 +6,8 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'dashboard')
-    const claims = listWarrantyClaims()
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'dashboard')
+    const claims = await listWarrantyClaims()
     return NextResponse.json({ claims })
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

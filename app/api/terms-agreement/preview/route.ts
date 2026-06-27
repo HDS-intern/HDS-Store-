@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin', 'staff', 'customer'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin', 'staff', 'customer'])
 
     const { searchParams } = new URL(request.url)
     if (searchParams.get('stream') === '1') {

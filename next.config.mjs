@@ -44,6 +44,7 @@ function getAllowedDevOrigins() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['pg'],
   typescript: {
     ignoreBuildErrors: true,
   },

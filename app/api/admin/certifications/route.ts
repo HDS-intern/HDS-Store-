@@ -10,8 +10,8 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
-    return NextResponse.json({ certifications: getCertifications() })
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
+    return NextResponse.json({ certifications: await getCertifications() })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     const status = msg === 'Unauthorized' ? 401 : 500
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     const body = await request.json()
     const type = String(body.type ?? '').trim()
     const logoUrl = String(body.logoUrl ?? '').trim()
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Certification image is required' }, { status: 400 })
     }
 
-    const certification = addCertification({ type, logoUrl, imageUrl, productId, productName })
+    const certification = await addCertification({ type, logoUrl, imageUrl, productId, productName })
     return NextResponse.json({ success: true, certification })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
@@ -56,12 +56,12 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     const id = new URL(request.url).searchParams.get('id')
     if (!id) {
       return NextResponse.json({ error: 'Certification id is required' }, { status: 400 })
     }
-    if (!deleteCertification(id)) {
+    if (!(await deleteCertification(id))) {
       return NextResponse.json({ error: 'Certification not found' }, { status: 404 })
     }
     return NextResponse.json({ success: true })

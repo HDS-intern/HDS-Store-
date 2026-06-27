@@ -15,8 +15,8 @@ const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'home')
 
 export async function GET(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
-    const template = getMainTemplate()
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
+    const template = await getMainTemplate()
     return NextResponse.json({ template })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     const body = await request.json()
     const template = body.template as MainTemplate
 
@@ -35,8 +35,8 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'At least one slideshow slide is required' }, { status: 400 })
     }
 
-    saveMainTemplate(template)
-    return NextResponse.json({ success: true, template: getMainTemplate() })
+    await saveMainTemplate(template)
+    return NextResponse.json({ success: true, template: await getMainTemplate() })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     const status = msg === 'Unauthorized' ? 401 : 500
@@ -46,7 +46,7 @@ export async function PUT(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    requireRole(getUserBySession(getTokenFromRequest(request)), ['admin'])
+    requireRole(await getUserBySession(getTokenFromRequest(request)), ['admin'])
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 

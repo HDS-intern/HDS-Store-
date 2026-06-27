@@ -1,4 +1,4 @@
-import { getDb } from './db'
+import { queryOne, execute } from './db'
 import { DEFAULT_MAIN_TEMPLATE, type MainTemplate } from './mainTemplateTypes'
 
 export type {
@@ -13,11 +13,11 @@ export { DEFAULT_MAIN_TEMPLATE, createSlideId } from './mainTemplateTypes'
 
 const SETTING_KEY = 'main_template'
 
-export function getMainTemplate(): MainTemplate {
-  const db = getDb()
-  const row = db.prepare('SELECT data FROM site_settings WHERE key = ?').get(SETTING_KEY) as
-    | { data: string }
-    | undefined
+export async function getMainTemplate(): Promise<MainTemplate> {
+  const row = await queryOne<{ data: string }>(
+    'SELECT data FROM site_settings WHERE key = ?',
+    [SETTING_KEY]
+  )
 
   if (!row) return DEFAULT_MAIN_TEMPLATE
 
@@ -33,11 +33,11 @@ export function getMainTemplate(): MainTemplate {
   }
 }
 
-export function saveMainTemplate(template: MainTemplate): void {
-  const db = getDb()
+export async function saveMainTemplate(template: MainTemplate): Promise<void> {
   const now = new Date().toISOString()
-  db.prepare(
+  await execute(
     `INSERT INTO site_settings (key, data, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`
-  ).run(SETTING_KEY, JSON.stringify(template), now)
+     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    [SETTING_KEY, JSON.stringify(template), now]
+  )
 }

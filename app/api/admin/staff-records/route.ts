@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { getDb } from '@/lib/db'
+import { query, queryOne, execute } from '@/lib/db'
 import { getUserBySession, getTokenFromRequest, requirePermission } from '@/lib/auth'
 import { validateStaffPhotoDataUrl } from '@/lib/staffPhoto'
 import type { StaffRecord } from '@/lib/types'
@@ -35,10 +35,11 @@ function rowToStaff(row: Record<string, unknown>): StaffRecord {
 
 export async function GET(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'staff_records')
-    const db = getDb()
-    const rows = db.prepare('SELECT * FROM staff_records ORDER BY created_at DESC').all()
-    return NextResponse.json({ staff: rows.map((r) => rowToStaff(r as Record<string, unknown>)) })
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'staff_records')
+    const rows = await query<Record<string, unknown>>(
+      'SELECT * FROM staff_records ORDER BY created_at DESC'
+    )
+    return NextResponse.json({ staff: rows.map((r) => rowToStaff(r)) })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     return NextResponse.json({ error: msg }, { status: msg === 'Unauthorized' ? 401 : 500 })
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'staff_records')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'staff_records')
     const body = await request.json()
     const photoError = validateStaffPhotoDataUrl(body.passportPhoto)
     if (photoError) {
@@ -57,40 +58,42 @@ export async function POST(request: Request) {
     const id = randomUUID()
     const now = new Date().toISOString()
 
-    const db = getDb()
-    db.prepare(
+    await execute(
       `INSERT INTO staff_records (
         id, user_id, employee_name, aadhaar_number, address, contact_number,
         alternate_contact_number, alternate_contact_person, bank_account_number, bank_name,
         bank_ifsc, pan_card, passport_photo, joining_date, work_status, resigned_date,
         resignation_letter, blood_group, medical_history, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      id,
-      body.userId || null,
-      body.employeeName,
-      body.aadhaarNumber || '',
-      body.address || '',
-      body.contactNumber || '',
-      body.alternateContactNumber || '',
-      body.alternateContactPerson || '',
-      body.bankAccountNumber || '',
-      body.bankName || '',
-      body.bankIfsc || '',
-      body.panCard || '',
-      body.passportPhoto || '',
-      body.joiningDate || '',
-      body.workStatus || 'live',
-      body.resignedDate || null,
-      body.resignationLetter || null,
-      body.bloodGroup || '',
-      body.medicalHistory || '',
-      now,
-      now
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        body.userId || null,
+        body.employeeName,
+        body.aadhaarNumber || '',
+        body.address || '',
+        body.contactNumber || '',
+        body.alternateContactNumber || '',
+        body.alternateContactPerson || '',
+        body.bankAccountNumber || '',
+        body.bankName || '',
+        body.bankIfsc || '',
+        body.panCard || '',
+        body.passportPhoto || '',
+        body.joiningDate || '',
+        body.workStatus || 'live',
+        body.resignedDate || null,
+        body.resignationLetter || null,
+        body.bloodGroup || '',
+        body.medicalHistory || '',
+        now,
+        now,
+      ]
     )
 
-    const row = db.prepare('SELECT * FROM staff_records WHERE id = ?').get(id)
-    return NextResponse.json({ staff: rowToStaff(row as Record<string, unknown>) })
+    const row = await queryOne<Record<string, unknown>>('SELECT * FROM staff_records WHERE id = ?', [
+      id,
+    ])
+    return NextResponse.json({ staff: rowToStaff(row!) })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     return NextResponse.json({ error: msg }, { status: msg === 'Unauthorized' ? 401 : 500 })
@@ -99,7 +102,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'staff_records')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'staff_records')
     const body = await request.json()
     if (!body.id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 
@@ -109,40 +112,42 @@ export async function PUT(request: Request) {
     }
 
     const now = new Date().toISOString()
-    const db = getDb()
-    db.prepare(
+    await execute(
       `UPDATE staff_records SET
         user_id = ?, employee_name = ?, aadhaar_number = ?, address = ?, contact_number = ?,
         alternate_contact_number = ?, alternate_contact_person = ?, bank_account_number = ?,
         bank_name = ?, bank_ifsc = ?, pan_card = ?, passport_photo = ?, joining_date = ?,
         work_status = ?, resigned_date = ?, resignation_letter = ?, blood_group = ?,
         medical_history = ?, updated_at = ?
-      WHERE id = ?`
-    ).run(
-      body.userId || null,
-      body.employeeName,
-      body.aadhaarNumber || '',
-      body.address || '',
-      body.contactNumber || '',
-      body.alternateContactNumber || '',
-      body.alternateContactPerson || '',
-      body.bankAccountNumber || '',
-      body.bankName || '',
-      body.bankIfsc || '',
-      body.panCard || '',
-      body.passportPhoto || '',
-      body.joiningDate || '',
-      body.workStatus || 'live',
-      body.resignedDate || null,
-      body.resignationLetter || null,
-      body.bloodGroup || '',
-      body.medicalHistory || '',
-      now,
-      body.id
+      WHERE id = ?`,
+      [
+        body.userId || null,
+        body.employeeName,
+        body.aadhaarNumber || '',
+        body.address || '',
+        body.contactNumber || '',
+        body.alternateContactNumber || '',
+        body.alternateContactPerson || '',
+        body.bankAccountNumber || '',
+        body.bankName || '',
+        body.bankIfsc || '',
+        body.panCard || '',
+        body.passportPhoto || '',
+        body.joiningDate || '',
+        body.workStatus || 'live',
+        body.resignedDate || null,
+        body.resignationLetter || null,
+        body.bloodGroup || '',
+        body.medicalHistory || '',
+        now,
+        body.id,
+      ]
     )
 
-    const row = db.prepare('SELECT * FROM staff_records WHERE id = ?').get(body.id)
-    return NextResponse.json({ staff: rowToStaff(row as Record<string, unknown>) })
+    const row = await queryOne<Record<string, unknown>>('SELECT * FROM staff_records WHERE id = ?', [
+      body.id,
+    ])
+    return NextResponse.json({ staff: rowToStaff(row!) })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     return NextResponse.json({ error: msg }, { status: msg === 'Unauthorized' ? 401 : 500 })
@@ -151,10 +156,9 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'staff_records')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'staff_records')
     const { id } = await request.json()
-    const db = getDb()
-    db.prepare('DELETE FROM staff_records WHERE id = ?').run(id)
+    await execute('DELETE FROM staff_records WHERE id = ?', [id])
     return NextResponse.json({ success: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'

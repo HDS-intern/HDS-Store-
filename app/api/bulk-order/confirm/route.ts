@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { randomUUID } from 'crypto'
-import { getDb } from '@/lib/db'
+import { execute } from '@/lib/db'
 import { getUserBySession, getTokenFromRequest } from '@/lib/auth'
 
 export const runtime = 'nodejs'
@@ -15,7 +14,7 @@ type ConfirmItem = {
 
 export async function POST(request: Request) {
   try {
-    const user = getUserBySession(getTokenFromRequest(request))
+    const user = await getUserBySession(getTokenFromRequest(request))
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -37,11 +36,11 @@ export async function POST(request: Request) {
     const id = `BULK-${Date.now()}`
     const now = new Date().toISOString()
 
-    const db = getDb()
-    db.prepare(
+    await execute(
       `INSERT INTO bulk_order_confirmations (id, user_id, user_name, items, total, status, created_at, order_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, user.id, user.name, JSON.stringify(items), total, 'paid', now, orderId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, user.id, user.name, JSON.stringify(items), total, 'paid', now, orderId]
+    )
 
     return NextResponse.json({
       confirmationId: id,

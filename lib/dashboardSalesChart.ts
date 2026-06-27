@@ -1,4 +1,4 @@
-import type { Database } from 'better-sqlite3'
+import { query } from './db'
 import type { SalesChartFilter } from './salesChartFilter'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -146,18 +146,16 @@ function bucketKeyForRow(createdAt: string, granularity: 'day' | 'month'): strin
   return granularity === 'day' ? createdAt.slice(0, 10) : createdAt.slice(0, 7)
 }
 
-function aggregateOrders(
-  db: Database.Database,
+async function aggregateOrders(
   buckets: BucketDef[],
   fromDate: string
-): Map<string, SalesChartMonth> {
-  const rows = db
-    .prepare(
-      `SELECT items, total, status, payment_status, created_at, returned_qty, warranty_claim_qty
-       FROM orders
-       WHERE created_at >= ?`
-    )
-    .all(fromDate) as OrderRow[]
+): Promise<Map<string, SalesChartMonth>> {
+  const rows = await query<OrderRow>(
+    `SELECT items, total, status, payment_status, created_at, returned_qty, warranty_claim_qty
+     FROM orders
+     WHERE created_at >= ?`,
+    [fromDate]
+  )
 
   const granularity = buckets[0]?.granularity ?? 'month'
   const map = new Map(buckets.map((bucket) => [bucket.key, emptyBucket(bucket)]))
@@ -191,8 +189,7 @@ function aggregateOrders(
   return map
 }
 
-function aggregateWarrantyClaims(
-  db: Database.Database,
+async function aggregateWarrantyClaims(
   map: Map<string, SalesChartMonth>,
   buckets: BucketDef[],
   fromDate: string
@@ -200,14 +197,13 @@ function aggregateWarrantyClaims(
   const granularity = buckets[0]?.granularity ?? 'month'
   const bucketKeys = new Set(buckets.map((b) => b.key))
 
-  const warrantyRows = db
-    .prepare(
-      `SELECT created_at
-       FROM contact_messages
-       WHERE LOWER(subject) LIKE '%warranty%'
-         AND created_at >= ?`
-    )
-    .all(fromDate) as { created_at: string }[]
+  const warrantyRows = await query<{ created_at: string }>(
+    `SELECT created_at
+     FROM contact_messages
+     WHERE LOWER(subject) LIKE '%warranty%'
+       AND created_at >= ?`,
+    [fromDate]
+  )
 
   for (const row of warrantyRows) {
     const key = bucketKeyForRow(row.created_at, granularity)
@@ -217,11 +213,10 @@ function aggregateWarrantyClaims(
   }
 }
 
-export function buildSalesChartData(
-  db: Database.Database,
+export async function buildSalesChartData(
   filter?: SalesChartFilter | null,
   defaultMonthCount = 6
-): SalesChartMonth[] {
+): Promise<SalesChartMonth[]> {
   const effectiveBuckets = filter
     ? resolveBuckets(filter)
     : lastMonths(defaultMonthCount).map((key) => ({
@@ -235,8 +230,8 @@ export function buildSalesChartData(
       ? `${effectiveBuckets[0].key}T00:00:00`
       : `${effectiveBuckets[0]?.key ?? '2000-01'}-01`
 
-  const map = aggregateOrders(db, effectiveBuckets, fromDate)
-  aggregateWarrantyClaims(db, map, effectiveBuckets, fromDate)
+  const map = await aggregateOrders(effectiveBuckets, fromDate)
+  await aggregateWarrantyClaims(map, effectiveBuckets, fromDate)
 
   return effectiveBuckets.map((bucket) => map.get(bucket.key) ?? emptyBucket(bucket))
 }

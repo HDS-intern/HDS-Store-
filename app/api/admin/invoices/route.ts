@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { getUserBySession, getTokenFromRequest, requireStaffAccess } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
 import { getAllInvoices } from '@/lib/invoices'
+import type { User } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
-function canViewInvoices(user: NonNullable<ReturnType<typeof getUserBySession>>) {
+function canViewInvoices(user: User) {
   return (
     hasPermission(user, 'orders_view') ||
     hasPermission(user, 'orders_manage') ||
@@ -16,12 +17,12 @@ function canViewInvoices(user: NonNullable<ReturnType<typeof getUserBySession>>)
 
 export async function GET(request: Request) {
   try {
-    const user = requireStaffAccess(getUserBySession(getTokenFromRequest(request)))
+    const user = requireStaffAccess(await getUserBySession(getTokenFromRequest(request)))
     if (!canViewInvoices(user)) {
       throw new Error('Unauthorized')
     }
 
-    const invoices = getAllInvoices()
+    const invoices = await getAllInvoices()
     return NextResponse.json(
       { invoices },
       {

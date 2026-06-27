@@ -11,7 +11,7 @@ const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'products')
 
 export async function POST(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'inventory_manage')
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 

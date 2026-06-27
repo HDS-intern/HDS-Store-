@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hds-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hds
+      POSTGRES_PASSWORD: hds_dev_password
+      POSTGRES_DB: hds_store
+    ports:
+      - '5432:5432'
+    volumes:
+      - hds_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hds -d hds_store']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hds_pg_data:

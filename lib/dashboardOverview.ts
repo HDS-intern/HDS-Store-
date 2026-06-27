@@ -1,5 +1,4 @@
-import type { Database } from 'better-sqlite3'
-import { getAllProducts } from './db'
+import { getAllProducts, query } from './db'
 
 type CartItem = {
   productId?: string
@@ -93,13 +92,8 @@ function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-export function buildDashboardOverviewExtras(db: Database): DashboardOverviewExtras {
-  const orders = db
-    .prepare(
-      `SELECT id, user_id, items, total, status, payment_status, payment_method, created_at
-       FROM orders WHERE status != 'cancelled' ORDER BY created_at DESC`
-    )
-    .all() as {
+export async function buildDashboardOverviewExtras(): Promise<DashboardOverviewExtras> {
+  const orders = await query<{
     id: string
     user_id: string
     items: string
@@ -108,7 +102,10 @@ export function buildDashboardOverviewExtras(db: Database): DashboardOverviewExt
     payment_status: string
     payment_method: string | null
     created_at: string
-  }[]
+  }>(
+    `SELECT id, user_id, items, total, status, payment_status, payment_method, created_at
+     FROM orders WHERE status != 'cancelled' ORDER BY created_at DESC`
+  )
 
   const paidOrders = orders.filter((o) => o.payment_status === 'paid')
   const totalRevenue = paidOrders.reduce((s, o) => s + o.total, 0)
@@ -164,7 +161,7 @@ export function buildDashboardOverviewExtras(db: Database): DashboardOverviewExt
   const productAgg = new Map<string, { name: string; sold: number; revenue: number; category: string }>()
   const categoryAgg = new Map<string, { sales: number; orders: number; products: Set<string> }>()
   const paymentAgg = new Map<string, { value: number; orders: number }>()
-  const products = getAllProducts()
+  const products = await getAllProducts()
   const productMap = new Map(products.map((p) => [p.id, p]))
 
   for (const label of DASHBOARD_PAYMENT_CHANNELS) {
@@ -233,7 +230,7 @@ export function buildDashboardOverviewExtras(db: Database): DashboardOverviewExt
     return { label, value: row.value, orders: row.orders }
   })
 
-  const userRows = db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]
+  const userRows = await query<{ id: string; name: string }>('SELECT id, name FROM users')
   const userMap = new Map(userRows.map((u) => [u.id, u.name]))
 
   const recentOrders = orders.slice(0, 5).map((o) => ({

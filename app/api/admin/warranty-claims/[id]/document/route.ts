@@ -22,9 +22,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'dashboard')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'dashboard')
     const { id } = await params
-    const doc = getWarrantyClaimDocument(id)
+    const doc = await getWarrantyClaimDocument(id)
 
     if (!doc) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })

@@ -12,17 +12,17 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'dashboard')
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'dashboard')
 
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId') || undefined
 
     return NextResponse.json({
-      chart: getBadReviewChart(productId),
-      products: getBadReviewProducts(),
-      entries: getBadReviewEntries(productId),
-      goodEntries: getGoodReviewEntries(productId),
-      productScores: getProductReviewScores(),
+      chart: await getBadReviewChart(productId),
+      products: await getBadReviewProducts(),
+      entries: await getBadReviewEntries(productId),
+      goodEntries: await getGoodReviewEntries(productId),
+      productScores: await getProductReviewScores(),
     })
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

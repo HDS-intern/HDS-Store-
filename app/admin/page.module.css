@@ -277,6 +277,198 @@
   border-radius: 0.875rem;
 }
 
+.inventoryTableWrap {
+  overflow-x: hidden;
+}
+
+.inventoryTable {
+  table-layout: fixed;
+  width: 100%;
+  font-size: 0.8125rem;
+}
+
+.inventoryTable th,
+.inventoryTable td {
+  padding: 0.625rem 0.5rem;
+  overflow: hidden;
+}
+
+.inventoryTable th:first-child,
+.inventoryTable td:first-child {
+  padding-left: 0.75rem;
+}
+
+.inventoryTable th:last-child,
+.inventoryTable td:last-child {
+  padding-right: 0.75rem;
+}
+
+.inventoryColProduct {
+  width: 12%;
+}
+
+.inventoryColSku {
+  width: 15%;
+}
+
+.inventoryColPrice {
+  width: 9%;
+}
+
+.inventoryColNumeric {
+  width: 7%;
+}
+
+.inventoryColMinAlert {
+  width: 9%;
+}
+
+.inventoryColStatus {
+  width: 9%;
+}
+
+.inventoryColCert {
+  width: 10%;
+}
+
+.inventoryColActions {
+  width: 10%;
+}
+
+.inventoryPriceCell {
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+
+.inventoryNumericCell {
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventoryStatusCell {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.inventoryCertCell {
+  vertical-align: middle;
+}
+
+.inventoryCertContent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+
+.inventoryCertItem {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+}
+
+.inventoryCertType {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.inventoryCertIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.35);
+  color: var(--primary);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.inventoryCertIconBtn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.12);
+  transform: translateY(-1px);
+}
+
+.inventoryCertIconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.inventoryCertIconImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.2rem;
+}
+
+.inventoryProductName {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventorySkuCell {
+  min-width: 0;
+}
+
+.inventorySkuCell .modelIdCell span:first-child {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+}
+
+.inventorySkuCell .modelIdSub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.625rem;
+}
+
+.inventoryActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.inventoryActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  line-height: 1;
+}
+
+@media (max-width: 1100px) {
+  .inventoryTableWrap {
+    overflow-x: auto;
+  }
+
+  .inventoryTable {
+    min-width: 56rem;
+  }
+}
+
 .input {
   padding: 0.375rem 0.5rem;
   border-radius: 0.5rem;
@@ -404,6 +596,152 @@
   height: 1rem;
   accent-color: #3b82f6;
   cursor: pointer;
+}
+
+.editCertGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.875rem;
+  margin-top: 0.375rem;
+}
+
+.editCertRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+@media (min-width: 768px) {
+  .editCertRow {
+    grid-template-columns: minmax(11rem, 1fr) 5.5rem;
+    gap: 1.25rem;
+  }
+}
+
+.warrantyCertRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+  overflow: visible;
+}
+
+.warrantyCertRowSpan {
+  grid-column: 1 / -1;
+  margin-top: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .warrantyCertRow {
+    grid-template-columns: minmax(0, 1.4fr) minmax(11rem, 14rem) 5.5rem;
+    gap: 1.25rem;
+    align-items: end;
+  }
+
+  .editCertGrid {
+    grid-template-columns: 1fr 8rem;
+    align-items: end;
+  }
+}
+
+.warrantyCol {
+  min-width: 0;
+}
+
+.editCertTypeCol,
+.editCertLogoCol {
+  min-width: 0;
+  overflow: visible;
+}
+
+.editCertTypeCol .formLabel,
+.editCertLogoCol .formLabel,
+.warrantyCol .formLabel {
+  display: block;
+  margin-bottom: 0.375rem;
+}
+
+.editCertFieldLabel {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.editCertSelect {
+  width: 100%;
+}
+
+.editCertLogoField {
+  max-width: 5.5rem;
+}
+
+.editCertLogoField .formLabel {
+  display: block;
+  margin-bottom: 0.375rem;
+}
+
+.editCertLogoBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.35);
+  color: var(--primary);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.editCertLogoBtnFilled {
+  border-style: solid;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.editCertLogoBtn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.editCertLogoBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editCertStatus {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--card);
+  pointer-events: none;
+}
+
+.editCertStatusPending {
+  background: #ef4444;
+}
+
+.editCertStatusDone {
+  background: #22c55e;
+}
+
+.editCertLogoPreview {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--background);
 }
 
 .imagePickerRow {

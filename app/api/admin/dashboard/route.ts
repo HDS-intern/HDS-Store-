@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 import { getUserBySession, getTokenFromRequest, requirePermission } from '@/lib/auth'
 import { buildSalesChartData } from '@/lib/dashboardSalesChart'
 import { buildDashboardOverviewExtras } from '@/lib/dashboardOverview'
@@ -10,13 +10,17 @@ export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   try {
-    requirePermission(getUserBySession(getTokenFromRequest(request)), 'dashboard')
-    const db = getDb()
+    requirePermission(await getUserBySession(getTokenFromRequest(request)), 'dashboard')
     const today = new Date().toISOString().slice(0, 10)
-    ensureDailyAbsences(today)
+    await ensureDailyAbsences(today)
 
-    const productCount = db.prepare('SELECT COUNT(*) as c FROM products').get() as { c: number }
-    const orderStats = db.prepare(`
+    const productCount = await queryOne<{ c: number }>('SELECT COUNT(*) as c FROM products')
+    const orderStats = await queryOne<{
+      total: number
+      revenue: number
+      pending_orders: number
+      pending_payments: number
+    }>(`
       SELECT
         SUM(CASE WHEN status != 'cancelled' THEN 1 ELSE 0 END) as total,
         COALESCE(SUM(
@@ -33,31 +37,21 @@ export async function GET(request: Request) {
           END
         ) as pending_payments
       FROM orders
-    `).get() as {
-      total: number
-      revenue: number
-      pending_orders: number
-      pending_payments: number
-    }
+    `)
 
-    const liveStaff = db.prepare(
+    const liveStaff = await queryOne<{ c: number }>(
       "SELECT COUNT(*) as c FROM staff_records WHERE work_status = 'live'"
-    ).get() as { c: number }
+    )
 
-    const presentToday = db.prepare(
-      "SELECT COUNT(*) as c FROM staff_attendance WHERE date = ? AND status = 'present' AND check_in IS NOT NULL"
-    ).get(today) as { c: number }
+    const presentToday = await queryOne<{ c: number }>(
+      "SELECT COUNT(*) as c FROM staff_attendance WHERE date = ? AND status = 'present' AND check_in IS NOT NULL",
+      [today]
+    )
 
-    const salesChart = buildSalesChartData(db)
-    const overview = buildDashboardOverviewExtras(db)
+    const salesChart = await buildSalesChartData()
+    const overview = await buildDashboardOverviewExtras()
 
-    const attendanceRows = db.prepare(`
-      SELECT a.id, a.staff_id, a.date, a.status, a.check_in, a.check_out, s.employee_name
-      FROM staff_attendance a
-      JOIN staff_records s ON s.id = a.staff_id
-      WHERE a.date = ?
-      ORDER BY a.check_in ASC
-    `).all(today) as {
+    const attendanceRows = await query<{
       id: string
       staff_id: string
       date: string
@@ -65,16 +59,22 @@ export async function GET(request: Request) {
       check_in: string | null
       check_out: string | null
       employee_name: string
-    }[]
+    }>(`
+      SELECT a.id, a.staff_id, a.date, a.status, a.check_in, a.check_out, s.employee_name
+      FROM staff_attendance a
+      JOIN staff_records s ON s.id = a.staff_id
+      WHERE a.date = ?
+      ORDER BY a.check_in ASC
+    `, [today])
 
     const stats: DashboardStats = {
-      totalProducts: productCount.c,
-      totalOrders: orderStats.total ?? 0,
-      totalRevenue: orderStats.revenue ?? 0,
-      pendingOrders: orderStats.pending_orders ?? 0,
-      pendingPayments: orderStats.pending_payments ?? 0,
-      liveStaff: liveStaff.c,
-      presentToday: presentToday.c,
+      totalProducts: productCount?.c ?? 0,
+      totalOrders: orderStats?.total ?? 0,
+      totalRevenue: orderStats?.revenue ?? 0,
+      pendingOrders: orderStats?.pending_orders ?? 0,
+      pendingPayments: orderStats?.pending_payments ?? 0,
+      liveStaff: liveStaff?.c ?? 0,
+      presentToday: presentToday?.c ?? 0,
       salesChart,
       attendanceToday: attendanceRows.map((r) => ({
         id: r.id,

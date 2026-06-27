@@ -1,6 +1,6 @@
 import { randomInt } from 'crypto'
 import bcrypt from 'bcryptjs'
-import { getDb } from './db'
+import { query, queryOne, execute } from './db'
 import { sendMail } from './mail'
 import type { ContactMessage } from './contactMessages'
 
@@ -15,11 +15,11 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-export function getSyncedTicketEmail(): string | null {
-  const db = getDb()
-  const row = db
-    .prepare('SELECT data FROM site_settings WHERE key = ?')
-    .get(SETTINGS_KEY) as { data: string } | undefined
+export async function getSyncedTicketEmail(): Promise<string | null> {
+  const row = await queryOne<{ data: string }>(
+    'SELECT data FROM site_settings WHERE key = ?',
+    [SETTINGS_KEY]
+  )
 
   if (!row) return null
 
@@ -32,20 +32,19 @@ export function getSyncedTicketEmail(): string | null {
   }
 }
 
-export function setSyncedTicketEmail(email: string): void {
-  const db = getDb()
+export async function setSyncedTicketEmail(email: string): Promise<void> {
   const now = new Date().toISOString()
   const normalized = normalizeEmail(email)
 
-  db.prepare(
+  await execute(
     `INSERT INTO site_settings (key, data, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`
-  ).run(SETTINGS_KEY, JSON.stringify({ email: normalized }), now)
+     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    [SETTINGS_KEY, JSON.stringify({ email: normalized }), now]
+  )
 }
 
-export function clearSyncedTicketEmail(): void {
-  const db = getDb()
-  db.prepare('DELETE FROM site_settings WHERE key = ?').run(SETTINGS_KEY)
+export async function clearSyncedTicketEmail(): Promise<void> {
+  await execute('DELETE FROM site_settings WHERE key = ?', [SETTINGS_KEY])
 }
 
 function generateOtp(): string {
@@ -63,12 +62,12 @@ export async function sendTicketEmailOtp(email: string): Promise<void> {
   const expiresAt = new Date(Date.now() + OTP_MINUTES * 60 * 1000).toISOString()
   const now = new Date().toISOString()
 
-  const db = getDb()
-  db.prepare('DELETE FROM ticket_email_verifications WHERE email = ?').run(normalized)
-  db.prepare(
+  await execute('DELETE FROM ticket_email_verifications WHERE email = ?', [normalized])
+  await execute(
     `INSERT INTO ticket_email_verifications (email, otp_hash, expires_at, created_at)
-     VALUES (?, ?, ?, ?)`
-  ).run(normalized, otpHash, expiresAt, now)
+     VALUES (?, ?, ?, ?)`,
+    [normalized, otpHash, expiresAt, now]
+  )
 
   await sendMail({
     to: normalized,
@@ -98,7 +97,7 @@ export async function sendTicketEmailOtp(email: string): Promise<void> {
   }
 }
 
-export function verifyTicketEmailOtp(email: string, otp: string): boolean {
+export async function verifyTicketEmailOtp(email: string, otp: string): Promise<boolean> {
   const normalized = normalizeEmail(email)
   const code = otp.trim()
 
@@ -106,20 +105,18 @@ export function verifyTicketEmailOtp(email: string, otp: string): boolean {
     throw new Error('Please enter the 6-digit verification code')
   }
 
-  const db = getDb()
-  const row = db
-    .prepare(
-      `SELECT otp_hash, expires_at FROM ticket_email_verifications
-       WHERE email = ? ORDER BY created_at DESC LIMIT 1`
-    )
-    .get(normalized) as { otp_hash: string; expires_at: string } | undefined
+  const row = await queryOne<{ otp_hash: string; expires_at: string }>(
+    `SELECT otp_hash, expires_at FROM ticket_email_verifications
+     WHERE email = ? ORDER BY created_at DESC LIMIT 1`,
+    [normalized]
+  )
 
   if (!row) {
     throw new Error('No verification code found. Please request a new code.')
   }
 
   if (new Date(row.expires_at) < new Date()) {
-    db.prepare('DELETE FROM ticket_email_verifications WHERE email = ?').run(normalized)
+    await execute('DELETE FROM ticket_email_verifications WHERE email = ?', [normalized])
     throw new Error('Verification code expired. Please request a new code.')
   }
 
@@ -127,13 +124,13 @@ export function verifyTicketEmailOtp(email: string, otp: string): boolean {
     throw new Error('Invalid verification code')
   }
 
-  db.prepare('DELETE FROM ticket_email_verifications WHERE email = ?').run(normalized)
-  setSyncedTicketEmail(normalized)
+  await execute('DELETE FROM ticket_email_verifications WHERE email = ?', [normalized])
+  await setSyncedTicketEmail(normalized)
   return true
 }
 
 export async function notifySyncedEmailOfTicket(message: ContactMessage): Promise<void> {
-  const syncedEmail = getSyncedTicketEmail()
+  const syncedEmail = await getSyncedTicketEmail()
   if (!syncedEmail) return
 
   const escapeHtml = (value: string) =>

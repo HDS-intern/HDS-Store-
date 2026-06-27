@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -16,6 +16,7 @@ import {
   Heart,
   Share2,
   ChevronRight,
+  ChevronLeft,
   Truck,
   Shield,
   RotateCcw,
@@ -25,6 +26,8 @@ import {
   Phone,
   Mail,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 import styles from './page.module.css'
 
@@ -47,6 +50,32 @@ export default function ProductDetailPage() {
   const [showAddedNotification, setShowAddedNotification] = useState(false)
   const [selectedImage, setSelectedImage] = useState(0)
   const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [imageLightboxOpen, setImageLightboxOpen] = useState(false)
+  const [imageZoom, setImageZoom] = useState(1)
+
+  const MIN_ZOOM = 0.5
+  const MAX_ZOOM = 3
+  const ZOOM_STEP = 0.25
+
+  useEffect(() => {
+    if (!imageLightboxOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setImageLightboxOpen(false)
+        setImageZoom(1)
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [imageLightboxOpen])
 
   if (!product) {
     return (
@@ -93,6 +122,34 @@ export default function ProductDetailPage() {
     }
   }
 
+  const hasMultipleImages = galleryImages.length >= 2
+
+  const goToPrevImage = () => {
+    setSelectedImage((prev) => (prev - 1 + galleryImages.length) % galleryImages.length)
+  }
+
+  const goToNextImage = () => {
+    setSelectedImage((prev) => (prev + 1) % galleryImages.length)
+  }
+
+  const openImageLightbox = () => {
+    setImageZoom(1)
+    setImageLightboxOpen(true)
+  }
+
+  const closeImageLightbox = () => {
+    setImageLightboxOpen(false)
+    setImageZoom(1)
+  }
+
+  const zoomInImage = () => {
+    setImageZoom((prev) => Math.min(MAX_ZOOM, +(prev + ZOOM_STEP).toFixed(2)))
+  }
+
+  const zoomOutImage = () => {
+    setImageZoom((prev) => Math.max(MIN_ZOOM, +(prev - ZOOM_STEP).toFixed(2)))
+  }
+
   return (
     <div className={`${styles.page} flex flex-col min-h-screen bg-background`}>
       <Header />
@@ -118,25 +175,66 @@ export default function ProductDetailPage() {
       <div className="flex-1 mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <div className="space-y-4">
-            <div className="relative h-96 lg:h-[500px] rounded-xl overflow-hidden bg-gradient-to-br from-muted to-background border border-border">
-              <Image
-                src={galleryImages[selectedImage] || product.image}
-                alt={product.name}
-                fill
-                className="object-cover"
-                priority
-              />
+            <div className={styles.galleryMain}>
+              <button
+                type="button"
+                className={styles.galleryImageBtn}
+                onClick={openImageLightbox}
+                aria-label="View full size image"
+              >
+                <Image
+                  key={galleryImages[selectedImage]}
+                  src={galleryImages[selectedImage] || product.image}
+                  alt={`${product.name} — image ${selectedImage + 1}`}
+                  fill
+                  className={`object-cover ${styles.galleryImage}`}
+                  priority
+                />
+                <span className={styles.galleryHoverOverlay}>
+                  <ZoomIn className="w-7 h-7" />
+                  <span>Click to enlarge</span>
+                </span>
+              </button>
+              {hasMultipleImages && (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.galleryNavBtn} ${styles.galleryNavPrev}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      goToPrevImage()
+                    }}
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.galleryNavBtn} ${styles.galleryNavNext}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      goToNextImage()
+                    }}
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                  <div className={styles.galleryCounter}>
+                    {selectedImage + 1} / {galleryImages.length}
+                  </div>
+                </>
+              )}
               {discount > 0 && (
-                <div className="absolute top-4 right-4 bg-accent text-accent-foreground px-4 py-2 rounded-lg font-bold text-lg shadow-lg">
+                <div className="absolute top-4 right-4 bg-accent text-accent-foreground px-4 py-2 rounded-lg font-bold text-lg shadow-lg z-10">
                   -{discount}%
                 </div>
               )}
             </div>
-            {galleryImages.length > 1 && (
+            {hasMultipleImages && (
               <div className="grid grid-cols-4 gap-4">
-                {galleryImages.slice(0, 4).map((img, idx) => (
+                {galleryImages.map((img, idx) => (
                   <button
-                    key={idx}
+                    key={`${img}-${idx}`}
                     type="button"
                     onClick={() => setSelectedImage(idx)}
                     className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${
@@ -530,6 +628,62 @@ export default function ProductDetailPage() {
           </div>
         )}
       </div>
+
+      {imageLightboxOpen && (
+        <div
+          className={styles.lightboxBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Product image preview"
+          onClick={closeImageLightbox}
+        >
+          <div className={styles.lightboxModal} onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={styles.lightboxCloseBtn}
+              onClick={closeImageLightbox}
+              aria-label="Close preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className={styles.lightboxViewport}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={galleryImages[selectedImage] || product.image}
+                alt={`${product.name} — enlarged view`}
+                className={styles.lightboxImage}
+                style={{ transform: `scale(${imageZoom})` }}
+                draggable={false}
+              />
+            </div>
+
+            <div className={styles.lightboxToolbar}>
+              <button
+                type="button"
+                className={styles.lightboxZoomBtn}
+                onClick={zoomOutImage}
+                disabled={imageZoom <= MIN_ZOOM}
+                aria-label="Zoom out"
+              >
+                <ZoomOut className="w-5 h-5" />
+                Zoom out
+              </button>
+              <span className={styles.lightboxZoomLevel}>{Math.round(imageZoom * 100)}%</span>
+              <button
+                type="button"
+                className={styles.lightboxZoomBtn}
+                onClick={zoomInImage}
+                disabled={imageZoom >= MAX_ZOOM}
+                aria-label="Zoom in"
+              >
+                <ZoomIn className="w-5 h-5" />
+                Zoom in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { getDb } from './db'
+import { query, queryOne, execute } from './db'
 import type { WarrantyClaim } from './types'
 
 export const WARRANTY_CLAIMS_DIR = path.join(process.cwd(), 'data', 'warranty-claims')
@@ -35,30 +35,28 @@ function rowToClaim(row: WarrantyClaimRow): WarrantyClaim {
   }
 }
 
-export function listWarrantyClaims(): WarrantyClaim[] {
-  const db = getDb()
-  const rows = db
-    .prepare('SELECT * FROM warranty_claims ORDER BY created_at DESC')
-    .all() as WarrantyClaimRow[]
-
+export async function listWarrantyClaims(): Promise<WarrantyClaim[]> {
+  const rows = await query<WarrantyClaimRow>(
+    'SELECT * FROM warranty_claims ORDER BY created_at DESC'
+  )
   return rows.map(rowToClaim)
 }
 
-export function getWarrantyClaimDocument(id: string): {
+export async function getWarrantyClaimDocument(id: string): Promise<{
   path: string
   name: string
-} | null {
-  const db = getDb()
-  const row = db
-    .prepare('SELECT document_path, document_name FROM warranty_claims WHERE id = ?')
-    .get(id) as { document_path: string; document_name: string } | undefined
+} | null> {
+  const row = await queryOne<{ document_path: string; document_name: string }>(
+    'SELECT document_path, document_name FROM warranty_claims WHERE id = ?',
+    [id]
+  )
 
   if (!row || !fs.existsSync(row.document_path)) return null
 
   return { path: row.document_path, name: row.document_name }
 }
 
-export function createWarrantyClaim(input: {
+export async function createWarrantyClaim(input: {
   userId: string
   orderId: string
   productId: string
@@ -68,8 +66,7 @@ export function createWarrantyClaim(input: {
   notes: string
   documentBuffer: Buffer
   documentName: string
-}): WarrantyClaim {
-  const db = getDb()
+}): Promise<WarrantyClaim> {
   const id = `WC-${Date.now()}${randomBytes(3).toString('hex')}`
   const createdAt = new Date().toISOString()
 
@@ -79,27 +76,29 @@ export function createWarrantyClaim(input: {
   const documentPath = path.join(WARRANTY_CLAIMS_DIR, storedName)
   fs.writeFileSync(documentPath, input.documentBuffer)
 
-  db.prepare(
+  await execute(
     `INSERT INTO warranty_claims
      (id, user_id, order_id, product_id, product_name, customer_name, customer_email, notes, document_path, document_name, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    input.userId,
-    input.orderId,
-    input.productId,
-    input.productName.trim(),
-    input.customerName.trim(),
-    input.customerEmail.trim(),
-    input.notes.trim(),
-    documentPath,
-    input.documentName.trim(),
-    createdAt
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      input.userId,
+      input.orderId,
+      input.productId,
+      input.productName.trim(),
+      input.customerName.trim(),
+      input.customerEmail.trim(),
+      input.notes.trim(),
+      documentPath,
+      input.documentName.trim(),
+      createdAt,
+    ]
   )
 
-  db.prepare(
-    'UPDATE orders SET warranty_claim_qty = COALESCE(warranty_claim_qty, 0) + 1 WHERE id = ?'
-  ).run(input.orderId)
+  await execute(
+    'UPDATE orders SET warranty_claim_qty = COALESCE(warranty_claim_qty, 0) + 1 WHERE id = ?',
+    [input.orderId]
+  )
 
   return {
     id,
