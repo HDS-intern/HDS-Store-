@@ -26,7 +26,7 @@ export const PERMISSION_META: {
   { key: 'payments_view', label: 'View Payments', description: 'See payment records' },
   { key: 'payments_manage', label: 'Manage Payments', description: 'Authorize and update payments' },
   { key: 'staff_records', label: 'Staff Records', description: 'Access HR and employee data' },
-  { key: 'users_manage', label: 'System Users', description: 'Create users and set permissions' },
+  { key: 'users_manage', label: 'System Users', description: 'Create, edit, delete users and set permissions' },
 ]
 
 export const ALL_PERMISSION_KEYS = PERMISSION_META.map((p) => p.key)

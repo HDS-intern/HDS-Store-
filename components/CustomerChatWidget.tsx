@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
-import { Bot, MessageCircle, Send, Ticket, X } from 'lucide-react'
+import { Bot, Check, ChevronDown, MessageCircle, Send, Ticket, X } from 'lucide-react'
 import { useApp } from '@/lib/context'
 import { apiFetch } from '@/lib/api'
 import { TICKET_SUBJECT_OPTIONS } from '@/lib/ticketSubjects'
@@ -32,6 +33,187 @@ const emptyTicketForm = (name = '', email = '') => ({
   subject: TICKET_SUBJECT_OPTIONS[0],
   message: '',
 })
+
+const SUBJECT_MENU_CLOSE_MS = 240
+
+function TicketSubjectDropdown({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (subject: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    maxHeight: 256,
+    openUp: false,
+    bottom: 0,
+  })
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLUListElement>(null)
+  const closeTimerRef = useRef<number | null>(null)
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const gap = 6
+    const viewportPadding = 10
+    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding
+    const spaceAbove = rect.top - gap - viewportPadding
+    const openUp = spaceBelow < 148 && spaceAbove > spaceBelow
+    const maxHeight = Math.max(104, Math.min(256, openUp ? spaceAbove : spaceBelow))
+
+    setMenuPosition({
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+      openUp,
+      top: openUp ? 0 : rect.bottom + gap,
+      bottom: openUp ? window.innerHeight - rect.top + gap : 0,
+    })
+  }, [])
+
+  const setMenuOpen = useCallback((next: boolean) => {
+    setOpen(next)
+  }, [])
+
+  const closeMenu = useCallback(() => {
+    if (!open || closing) return
+    setClosing(true)
+    closeTimerRef.current = window.setTimeout(() => {
+      setMenuOpen(false)
+      setClosing(false)
+    }, SUBJECT_MENU_CLOSE_MS)
+  }, [open, closing, setMenuOpen])
+
+  const openMenu = useCallback(() => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+    setClosing(false)
+    updateMenuPosition()
+    setMenuOpen(true)
+  }, [setMenuOpen, updateMenuPosition])
+
+  useEffect(() => {
+    setMounted(true)
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    updateMenuPosition()
+  }, [open, updateMenuPosition])
+
+  useEffect(() => {
+    if (!open) return
+    const onReposition = () => updateMenuPosition()
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (triggerRef.current?.contains(target)) return
+      if (menuRef.current?.contains(target)) return
+      closeMenu()
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu()
+    }
+
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onEscape)
+
+    return () => {
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [open, closeMenu, updateMenuPosition])
+
+  const selectOption = (option: string) => {
+    onChange(option)
+    closeMenu()
+  }
+
+  const menuVisible = open || closing
+
+  return (
+    <div className={styles.subjectDropdown}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`${styles.subjectTrigger} ${open ? styles.subjectTriggerOpen : ''}`}
+        onClick={() => (open ? closeMenu() : openMenu())}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls="hds-ticket-subject-menu"
+      >
+        <span className={styles.subjectTriggerLabel}>{value}</span>
+        <ChevronDown
+          className={`${styles.subjectChevron} ${open ? styles.subjectChevronOpen : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {mounted &&
+        menuVisible &&
+        createPortal(
+          <ul
+            ref={menuRef}
+            id="hds-ticket-subject-menu"
+            className={`${styles.subjectMenu} ${menuPosition.openUp ? styles.subjectMenuUp : ''} ${closing ? styles.subjectMenuOut : styles.subjectMenuIn}`}
+            role="listbox"
+            aria-label="Ticket subject"
+            style={
+              menuPosition.openUp
+                ? {
+                    left: menuPosition.left,
+                    width: menuPosition.width,
+                    maxHeight: menuPosition.maxHeight,
+                    bottom: menuPosition.bottom,
+                    top: 'auto',
+                  }
+                : {
+                    top: menuPosition.top,
+                    left: menuPosition.left,
+                    width: menuPosition.width,
+                    maxHeight: menuPosition.maxHeight,
+                    bottom: 'auto',
+                  }
+            }
+            onWheel={(event) => event.stopPropagation()}
+          >
+            {TICKET_SUBJECT_OPTIONS.map((option, index) => (
+              <li key={option} role="presentation">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={value === option}
+                  className={`${styles.subjectOption} ${value === option ? styles.subjectOptionActive : ''}`}
+                  style={{ '--option-index': index } as React.CSSProperties}
+                  onClick={() => selectOption(option)}
+                >
+                  <span>{option}</span>
+                  {value === option && <Check className={styles.subjectCheck} aria-hidden="true" />}
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body
+        )}
+    </div>
+  )
+}
 
 export function CustomerChatWidget() {
   const pathname = usePathname()
@@ -336,17 +518,10 @@ export function CustomerChatWidget() {
                   </label>
                   <label className={styles.ticketField}>
                     <span>Subject *</span>
-                    <select
-                      className="hds-select"
+                    <TicketSubjectDropdown
                       value={ticketForm.subject}
-                      onChange={(e) => setTicketForm((prev) => ({ ...prev, subject: e.target.value }))}
-                    >
-                      {TICKET_SUBJECT_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(subject) => setTicketForm((prev) => ({ ...prev, subject }))}
+                    />
                   </label>
                   <label className={styles.ticketField}>
                     <span>Message *</span>

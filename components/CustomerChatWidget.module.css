@@ -92,6 +92,47 @@
   overflow: hidden;
   transform-origin: bottom right;
   animation: panelIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  --chat-tabs-bg: var(--muted);
+  --chat-tab-color: var(--muted-foreground);
+  --chat-tab-hover-bg: rgba(53, 106, 176, 0.12);
+  --chat-tab-hover-color: #1e3a5f;
+  --chat-tab-active-bg: #ffffff;
+  --chat-tab-active-color: #1e3a5f;
+  --chat-tab-active-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --chat-messages-bg: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  --chat-bot-bubble-bg: #eef2ff;
+  --chat-bot-bubble-color: #1e293b;
+  --chat-bot-bubble-border: rgba(99, 102, 241, 0.15);
+  --chat-input-bg: var(--card);
+  --chat-input-color: var(--foreground);
+  --chat-input-border: rgba(148, 163, 184, 0.35);
+  --chat-success-title: #1e3a5f;
+  --chat-select-chevron: var(--hds-select-chevron);
+  --chat-option-bg: #ffffff;
+  --chat-option-color: #1e293b;
+}
+
+:global(.dark) .panel {
+  --chat-tabs-bg: rgba(15, 23, 42, 0.92);
+  --chat-tab-color: #94a3b8;
+  --chat-tab-hover-bg: rgba(59, 130, 246, 0.2);
+  --chat-tab-hover-color: #e2e8f0;
+  --chat-tab-active-bg: #334155;
+  --chat-tab-active-color: #f8fafc;
+  --chat-tab-active-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  --chat-messages-bg: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --chat-bot-bubble-bg: #1e3a5f;
+  --chat-bot-bubble-color: #e2e8f0;
+  --chat-bot-bubble-border: rgba(96, 165, 250, 0.28);
+  --chat-input-bg: #1e293b;
+  --chat-input-color: #f1f5f9;
+  --chat-input-border: rgba(148, 163, 184, 0.32);
+  --chat-success-title: #93c5fd;
+  --chat-select-chevron: var(--hds-select-chevron-dark);
+  --chat-option-bg: #1e293b;
+  --chat-option-color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 
 .header {
@@ -138,7 +179,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
   padding: 0.5rem;
-  background: var(--muted);
+  background: var(--chat-tabs-bg);
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
@@ -159,18 +200,18 @@
 
 .tab {
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--chat-tab-color);
 }
 
 .tab:hover {
-  background: var(--muted);
-  color: #1e3a5f;
+  background: var(--chat-tab-hover-bg);
+  color: var(--chat-tab-hover-color);
 }
 
 .tabActive {
-  background: var(--card);
-  color: #1e3a5f;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  background: var(--chat-tab-active-bg);
+  color: var(--chat-tab-active-color);
+  box-shadow: var(--chat-tab-active-shadow);
 }
 
 .tabBadge {
@@ -193,6 +234,15 @@
   padding: 0.625rem 0.75rem;
   background: linear-gradient(90deg, rgba(53, 106, 176, 0.1), rgba(34, 197, 94, 0.08));
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+:global(.dark) .ticketBanner {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.14), rgba(34, 197, 94, 0.1));
+  border-bottom-color: rgba(148, 163, 184, 0.22);
+}
+
+:global(.dark) .ticketBannerText {
+  color: #cbd5e1;
 }
 
 .liveSupportText,
@@ -246,7 +296,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  background: var(--chat-messages-bg);
 }
 
 .messageRow {
@@ -280,9 +330,9 @@
 }
 
 .bubbleBot {
-  background: #eef2ff;
-  color: var(--foreground);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  background: var(--chat-bot-bubble-bg);
+  color: var(--chat-bot-bubble-color);
+  border: 1px solid var(--chat-bot-bubble-border);
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -309,6 +359,11 @@
   border-radius: 0.5rem;
 }
 
+:global(.dark) .notice {
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+}
+
 .composer {
   display: flex;
   gap: 0.5rem;
@@ -317,15 +372,26 @@
   background: var(--card);
 }
 
+:global(.dark) .composer {
+  border-top-color: rgba(148, 163, 184, 0.22);
+}
+
 .input {
   flex: 1;
   min-width: 0;
   padding: 0.625rem 0.75rem;
   border-radius: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--chat-input-border);
+  background: var(--chat-input-bg);
+  color: var(--chat-input-color);
   font-size: 0.8125rem;
   resize: none;
   outline: none;
+}
+
+.input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.85;
 }
 
 .input:focus {
@@ -439,7 +505,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 0.875rem;
-  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  background: var(--chat-messages-bg);
 }
 
 .ticketForm {
@@ -462,22 +528,227 @@
   width: 100%;
   padding: 0.5rem 0.625rem;
   border-radius: 0.625rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--chat-input-border);
   font-size: 0.8125rem;
-  color: var(--foreground);
-  background: var(--card);
+  color: var(--chat-input-color);
+  background: var(--chat-input-bg);
   outline: none;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease;
 }
 
-.ticketField select {
+.subjectDropdown {
+  position: relative;
   width: 100%;
 }
 
+.subjectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--chat-input-border);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--chat-input-color);
+  background: var(--chat-input-bg);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s ease;
+}
+
+.subjectTrigger:hover {
+  border-color: rgba(53, 106, 176, 0.45);
+}
+
+:global(.dark) .subjectTrigger:hover {
+  border-color: rgba(96, 165, 250, 0.45);
+  background-color: #243044;
+}
+
+.subjectTriggerOpen {
+  border-color: #356ab0;
+  box-shadow: 0 0 0 3px rgba(53, 106, 176, 0.15);
+}
+
+:global(.dark) .subjectTriggerOpen {
+  border-color: rgba(96, 165, 250, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.subjectTriggerLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subjectChevron {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), color 0.22s ease;
+}
+
+.subjectChevronOpen {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+.subjectMenu {
+  position: fixed;
+  z-index: 96;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  transform-origin: top center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.subjectMenu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.subjectMenu::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.subjectMenuUp {
+  transform-origin: bottom center;
+}
+
+:global(.dark) .subjectMenu {
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(148, 163, 184, 0.12) inset;
+}
+
+.subjectMenuIn {
+  animation: subjectMenuIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.subjectMenuOut {
+  animation: subjectMenuOut 0.24s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.subjectOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: subjectOptionIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--option-index, 0) * 0.045s);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.subjectOption:hover {
+  background: rgba(53, 106, 176, 0.1);
+  transform: translateX(2px);
+}
+
+:global(.dark) .subjectOption:hover {
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.subjectOptionActive {
+  background: rgba(53, 106, 176, 0.14);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+:global(.dark) .subjectOptionActive {
+  background: rgba(59, 130, 246, 0.22);
+  color: #93c5fd;
+}
+
+.subjectCheck {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+@keyframes subjectMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes subjectMenuOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+
+@keyframes subjectOptionIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .ticketField input:focus,
-.ticketField select:focus,
 .ticketField textarea:focus {
   border-color: #356ab0;
   box-shadow: 0 0 0 3px rgba(53, 106, 176, 0.15);
+}
+
+:global(.dark) .ticketField input:focus,
+:global(.dark) .ticketField textarea:focus {
+  border-color: rgba(96, 165, 250, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
 }
 
 .ticketField textarea {
@@ -526,7 +797,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 800;
-  color: #1e3a5f;
+  color: var(--chat-success-title);
 }
 
 .ticketSuccessText {

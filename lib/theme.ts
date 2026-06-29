@@ -8,13 +8,18 @@ export const DEFAULT_THEME: Theme = 'light'
 /** Admin area always uses dark mode */
 export const ADMIN_DEFAULT_THEME: Theme = 'dark'
 
+export function isAdminDashboard(pathname: string): boolean {
+  return pathname.startsWith('/admin')
+}
+
+export function isAdminLoginPage(pathname: string, search = ''): boolean {
+  if (pathname !== '/login') return false
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  return params.get('admin') === '1'
+}
+
 export function isAdminArea(pathname: string, search = ''): boolean {
-  if (pathname.startsWith('/admin')) return true
-  if (pathname === '/login') {
-    const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
-    return params.get('admin') === '1'
-  }
-  return false
+  return isAdminDashboard(pathname) || isAdminLoginPage(pathname, search)
 }
 
 export function applyTheme(theme: Theme) {
@@ -46,4 +51,4 @@ export function getThemeFromDocument(): Theme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
 }
 
-export const themeInitScript = `(function(){try{var root=document.documentElement;var path=location.pathname;var search=location.search||'';var isAdmin=path.indexOf('/admin')===0||(path==='/login'&&search.indexOf('admin=1')!==-1);if(isAdmin){root.classList.add('dark');root.style.colorScheme='dark';return;}var t=localStorage.getItem('${THEME_STORAGE_KEY}');if(t==='dark'){root.classList.add('dark');root.style.colorScheme='dark';}else{root.classList.remove('dark');root.style.colorScheme='light';if(!t)localStorage.setItem('${THEME_STORAGE_KEY}','light');}}catch(e){}})();`
+export const themeInitScript = `(function(){try{var root=document.documentElement;var path=location.pathname;var search=location.search||'';var isAdminDashboard=path.indexOf('/admin')===0;if(isAdminDashboard){root.classList.add('dark');root.style.colorScheme='dark';return;}var t=localStorage.getItem('${THEME_STORAGE_KEY}');if(t==='dark'){root.classList.add('dark');root.style.colorScheme='dark';}else{root.classList.remove('dark');root.style.colorScheme='light';if(!t)localStorage.setItem('${THEME_STORAGE_KEY}','light');}}catch(e){}})();`

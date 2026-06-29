@@ -14,7 +14,7 @@ import {
   applyTheme,
   DEFAULT_THEME,
   getThemeFromDocument,
-  isAdminArea,
+  isAdminDashboard,
   readStoredTheme,
   type Theme,
   THEME_STORAGE_KEY,
@@ -42,9 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(DEFAULT_THEME)
 
   useEffect(() => {
-    const search = typeof window !== 'undefined' ? window.location.search : ''
-
-    if (isAdminArea(pathname, search)) {
+    if (isAdminDashboard(pathname)) {
       setThemeState('dark')
       applyTheme('dark')
       return
@@ -56,7 +54,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [pathname])
 
   const setTheme = useCallback((next: Theme) => {
-    if (typeof window !== 'undefined' && isAdminArea(pathname, window.location.search)) {
+    if (typeof window !== 'undefined' && isAdminDashboard(pathname)) {
       return
     }
     setThemeState(next)
@@ -64,7 +62,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [pathname])
 
   const toggleTheme = useCallback(() => {
-    if (typeof window !== 'undefined' && isAdminArea(pathname, window.location.search)) {
+    if (typeof window !== 'undefined' && isAdminDashboard(pathname)) {
       return
     }
     setThemeState((current) => {

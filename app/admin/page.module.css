@@ -1346,14 +1346,6 @@
   color: #86efac;
 }
 
-.editAccessPanel {
-  margin-top: 1.25rem;
-  padding: 1.25rem;
-  border: 1px solid rgba(53, 106, 176, 0.3);
-  border-radius: 0.875rem;
-  background: var(--background);
-}
-
 .editRoleField {
   max-width: 20rem;
   margin-bottom: 1rem;

@@ -1,8 +1,5 @@
 # Creates the local PostgreSQL role/database used by .env.local.
-# Requires a superuser connection (default: postgres on port 5433 for local PG 18 installs).
-# Usage:
-#   .\scripts\setup-postgres.ps1
-#   .\scripts\setup-postgres.ps1 -Port 5432 -SuperUserPassword your_postgres_password
+# Usage: .\scripts\setup-postgres.ps1
 
 param(
   [int]$Port = 5433,

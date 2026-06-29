@@ -531,15 +531,32 @@ function StaffMemberDropdown({
   value,
   staff,
   onChange,
+  onDeleteStaff,
+  canDelete = false,
 }: {
   value: string
   staff: StaffRecord[]
   onChange: (staffRecordId: string) => void
+  onDeleteStaff?: (member: StaffRecord) => void | Promise<void>
+  canDelete?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const position = useSelectMenuPosition(open, triggerRef)
   const selected = staff.find((member) => member.id === value)
+
+  const handleDeleteStaff = async (member: StaffRecord) => {
+    if (!onDeleteStaff) return
+    if (!window.confirm(`Delete staff record for "${member.employeeName}" permanently?`)) return
+    setDeletingId(member.id)
+    try {
+      await onDeleteStaff(member)
+      if (value === member.id) onChange('')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <div className={styles.selectWrap}>
@@ -589,7 +606,12 @@ function StaffMemberDropdown({
           </button>
         </li>
         {staff.map((member) => (
-          <li key={member.id} role="option" aria-selected={value === member.id}>
+          <li
+            key={member.id}
+            className={canDelete ? styles.selectOptionRow : undefined}
+            role="option"
+            aria-selected={value === member.id}
+          >
             <button
               type="button"
               className={`${styles.selectOption} ${value === member.id ? styles.selectOptionActive : ''}`}
@@ -607,6 +629,21 @@ function StaffMemberDropdown({
               </span>
               {value === member.id && <Check className={styles.selectCheck} />}
             </button>
+            {canDelete && (
+              <button
+                type="button"
+                className={styles.selectRoleDeleteBtn}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void handleDeleteStaff(member)
+                }}
+                disabled={deletingId === member.id}
+                aria-label={`Delete ${member.employeeName}`}
+                title={`Delete ${member.employeeName}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </li>
         ))}
         {staff.length === 0 && (
@@ -1521,6 +1558,23 @@ export default function AdminPage() {
     }
   }
 
+  const deleteStaffRecord = async (member: StaffRecord) => {
+    try {
+      await apiFetch('/api/admin/staff-records', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: member.id }),
+      })
+      showMsg(`Staff record "${member.employeeName}" deleted`, 'delete')
+      if (newUserForm.staffRecordId === member.id) {
+        handleStaffMemberChange('')
+      }
+      await loadAvailableStaff()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete staff record')
+      throw err
+    }
+  }
+
   const handleStaffMemberChange = (staffRecordId: string) => {
     const staff = availableStaff.find((record) => record.id === staffRecordId)
     if (!staff) {
@@ -2108,62 +2162,6 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              {editingAccess && (
-                <div className={styles.editAccessPanel}>
-                  <h3 className="font-bold mb-1 text-foreground">
-                    Edit Accessibility — {editingAccess.name}
-                  </h3>
-                  {isFullAdmin && editingAccess.id !== user?.id && (
-                    <div className={styles.editRoleField}>
-                      <label className={styles.formLabel}>Role</label>
-                      <RoleDropdown
-                        value={editingAccess.role}
-                        customRoles={customRoles}
-                        onCustomRolesChange={setCustomRoles}
-                        hiddenBuiltInRoles={hiddenBuiltInRoles}
-                        onHiddenBuiltInRolesChange={setHiddenBuiltInRoles}
-                        onChange={(role, permissions) =>
-                          setEditingAccess({
-                            ...editingAccess,
-                            role,
-                            permissions,
-                          })
-                        }
-                      />
-                    </div>
-                  )}
-                  <p className={styles.sectionHint}>
-                    {editingAccess.role === 'admin'
-                      ? 'Admin accounts have full access. Switch role to Staff to customize permissions.'
-                      : 'Select what this user can access in the control center.'}
-                  </p>
-                  <UserPermissionsForm
-                    value={editingAccess.permissions}
-                    onChange={(permissions) =>
-                      setEditingAccess({ ...editingAccess, permissions })
-                    }
-                    disabled={editingAccess.role === 'admin'}
-                  />
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnPrimary}`}
-                      onClick={saveUserAccess}
-                      disabled={editingAccess.id === user?.id && editingAccess.role === 'admin'}
-                    >
-                      Save Access
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnDanger}`}
-                      onClick={() => setEditingAccess(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -2361,6 +2359,8 @@ export default function AdminPage() {
                       value={newUserForm.staffRecordId}
                       staff={availableStaff}
                       onChange={handleStaffMemberChange}
+                      canDelete={isFullAdmin && canViewStaffRecords}
+                      onDeleteStaff={deleteStaffRecord}
                     />
                     {availableStaff.length === 0 && (
                       <p className={styles.sectionHint}>
@@ -2468,6 +2468,95 @@ export default function AdminPage() {
                 </div>
               </AdminSlideUp>
             </form>
+          </div>
+        </div>
+      )}
+
+      {editingAccess && (
+        <div
+          className={styles.createUserModalBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-access-title"
+          onClick={() => setEditingAccess(null)}
+        >
+          <div className={styles.createUserModal} onClick={(e) => e.stopPropagation()}>
+            <AdminSlideUp forceAnimate delayMs={0}>
+              <div className={styles.productModalHeader}>
+                <h3 id="edit-access-title" className={styles.productModalTitle}>
+                  Edit Accessibility — {editingAccess.name}
+                </h3>
+                <button
+                  type="button"
+                  className={styles.productModalClose}
+                  onClick={() => setEditingAccess(null)}
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </AdminSlideUp>
+
+            <AdminSlideUp forceAnimate delayMs={60}>
+              {isFullAdmin && editingAccess.id !== user?.id && (
+                <div className={styles.editRoleField}>
+                  <label className={styles.formLabel}>Role</label>
+                  <RoleDropdown
+                    value={editingAccess.role}
+                    customRoles={customRoles}
+                    onCustomRolesChange={setCustomRoles}
+                    hiddenBuiltInRoles={hiddenBuiltInRoles}
+                    onHiddenBuiltInRolesChange={setHiddenBuiltInRoles}
+                    onChange={(role, permissions) =>
+                      setEditingAccess({
+                        ...editingAccess,
+                        role,
+                        permissions,
+                      })
+                    }
+                  />
+                </div>
+              )}
+              <p className={styles.sectionHint}>
+                {editingAccess.role === 'admin'
+                  ? 'Admin accounts have full access. Switch role to Staff to customize permissions.'
+                  : 'Select what this user can access in the control center.'}
+              </p>
+              <UserPermissionsForm
+                value={editingAccess.permissions}
+                onChange={(permissions) => setEditingAccess({ ...editingAccess, permissions })}
+                disabled={editingAccess.role === 'admin'}
+              />
+            </AdminSlideUp>
+
+            <AdminSlideUp forceAnimate delayMs={120}>
+              <div className={`${styles.createUserModalActions} mt-4`}>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  onClick={saveUserAccess}
+                  disabled={editingAccess.id === user?.id && editingAccess.role === 'admin'}
+                >
+                  Save Access
+                </button>
+                {isFullAdmin && editingAccess.id !== user?.id && (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnDanger}`}
+                    onClick={() => {
+                      const target = staffUsers.find((u) => u.id === editingAccess.id)
+                      if (target) void deleteUserAccount(target)
+                    }}
+                    disabled={deletingUserId === editingAccess.id}
+                  >
+                    {deletingUserId === editingAccess.id ? 'Deleting…' : 'Delete User'}
+                  </button>
+                )}
+                <button type="button" className={styles.btn} onClick={() => setEditingAccess(null)}>
+                  Cancel
+                </button>
+              </div>
+            </AdminSlideUp>
           </div>
         </div>
       )}

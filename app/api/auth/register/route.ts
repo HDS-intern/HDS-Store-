@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { queryOne, execute, dbUserToUser, type DbUser } from '@/lib/db'
-import { hashPassword, createSession } from '@/lib/auth'
+import { hashPassword, createAccessToken } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
@@ -43,9 +43,13 @@ export async function POST(request: Request) {
     )
 
     const user = await queryOne<DbUser>('SELECT * FROM users WHERE id = ?', [id])
-    const token = await createSession(id)
+    if (!user) {
+      return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
+    }
 
-    return NextResponse.json({ token, user: dbUserToUser(user!) })
+    const token = createAccessToken(user)
+
+    return NextResponse.json({ token, user: dbUserToUser(user) })
   } catch {
     return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
   }

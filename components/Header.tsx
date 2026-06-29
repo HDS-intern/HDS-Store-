@@ -4,7 +4,7 @@ import styles from './Header.module.css'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useApp } from '@/lib/context'
-import { isAdminArea } from '@/lib/theme'
+import { isAdminDashboard } from '@/lib/theme'
 import { ShoppingCart, Heart, Menu, X, Search, FileSpreadsheet } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useEffect, useState } from 'react'
@@ -16,7 +16,7 @@ export function Header() {
   const [hideThemeToggle, setHideThemeToggle] = useState(false)
 
   useEffect(() => {
-    setHideThemeToggle(isAdminArea(pathname, window.location.search))
+    setHideThemeToggle(isAdminDashboard(pathname))
   }, [pathname])
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)

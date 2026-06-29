@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getUserByLogin, verifyPassword, createSession } from '@/lib/auth'
+import { getUserByLogin, verifyPassword, createAccessToken } from '@/lib/auth'
 import { dbUserToUser } from '@/lib/db'
 import { recordStaffLogin } from '@/lib/staffAttendance'
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const token = await createSession(user.id)
+    const token = createAccessToken(user)
 
     if (user.role === 'staff') {
       await recordStaffLogin(user.id)
